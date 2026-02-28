@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 
     // Show what we're doing
     print_separator();
-    print_step("Preparing AcreetionOS build environment");
+    print_step("Preparing AcreetionOS-XLibre build environment");
     printf("%s%s[%s] %sCommand:%s %s%s\n",
            COLOR_DIM, COLOR_CYAN, get_timestamp(),
            COLOR_BRIGHT_YELLOW, COLOR_RESET,
@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
             print_success("Build completed successfully!");
             printf("\n%s%s", COLOR_BRIGHT_GREEN, COLOR_BOLD);
             printf("    ╔═══════════════════════════════════════════════╗\n");
-            printf("    ║      ✓ AcreetionOS ISO Build Complete!       ║\n");
+            printf("    ║      ✓ AcreetionOS-XLibre ISO Build Complete!       ║\n");
             printf("    ╚═══════════════════════════════════════════════╝\n");
             printf("%s\n", COLOR_RESET);
 
@@ -305,7 +305,7 @@ void print_banner(void) {
     printf("║  %s██║ ╚═╝ ██║██║  ██╗██║  ██║██║  ██║╚██████╗██║  ██║██║███████║╚██████╔╝%s║\n", COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN);
     printf("║  %s╚═╝     ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝╚══════╝ ╚═════╝ %s║\n", COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN);
     printf("║                                                            ║\n");
-    printf("║          %sAcreetionOS ISO Build System - v%s%s           ║\n", COLOR_BRIGHT_YELLOW, VERSION, COLOR_BRIGHT_CYAN);
+    printf("║          %sAcreetionOS-XLibre ISO Build System - v%s%s           ║\n", COLOR_BRIGHT_YELLOW, VERSION, COLOR_BRIGHT_CYAN);
     printf("║              %sColorful C Wrapper Edition%s               ║\n", COLOR_BRIGHT_GREEN, COLOR_BRIGHT_CYAN);
     printf("║                                                            ║\n");
     printf("╚════════════════════════════════════════════════════════════╝\n");
@@ -427,5 +427,5 @@ void print_usage(void) {
     printf("This is a colorful wrapper around the standard mkarchiso tool.\n");
     printf("All arguments are passed directly to /usr/bin/mkarchiso\n\n");
     printf("%sExample:%s\n", COLOR_BOLD, COLOR_RESET);
-    printf("  %s -L AcreetionOS -v -o ../ISO . -C ./pacman.conf\n\n", PROGRAM_NAME);
+    printf("  %s -L AcreetionOS-XLibre -v -o ../ISO . -C ./pacman.conf\n\n", PROGRAM_NAME);
 }

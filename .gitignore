@@ -13,3 +13,4 @@ mkarchiso_wrapper
 
 # Pacman cache
 /var/cache/pacman/pkg/*
+.aider*

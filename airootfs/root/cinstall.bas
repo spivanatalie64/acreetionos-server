@@ -20,7 +20,7 @@ Cls
 
 Rem ChDir "/root/"
 
-Print "Welcome to Acreetion OS!"
+Print "Welcome to AcreetionOS-XLibre!"
 Print
 Print "Written By: Darren W. Clift"
 Print "            Johnathan Spiva"
@@ -97,7 +97,7 @@ loop99:
 
 Cls
 
-Print "Choose Drive to install Acreetion OS on"
+Print "Choose Drive to install AcreetionOS-XLibre on"
 Print "**WARNING**: All Data On drive will be destroyed!"
 Print "Including windows!!!!"
 Print
@@ -163,7 +163,7 @@ Print
 
 Rem create partitions and wipe disk.
 
-ptname$ = "AcreetionOS"
+ptname$ = "AcreetionOS-XLibre"
 
 Print
 Print "Creating Partion now!"

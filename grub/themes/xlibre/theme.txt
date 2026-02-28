@@ -1,4 +1,4 @@
-# AcreetionOS GRUB Theme
+# AcreetionOS-XLibre GRUB Theme
 desktop-image: "background.jpg"
 desktop-color: "#000000"
 title-text: ""

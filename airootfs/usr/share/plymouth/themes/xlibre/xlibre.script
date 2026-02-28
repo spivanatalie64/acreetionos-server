@@ -1,7 +1,7 @@
-# AcreetionOS Plymouth Theme Script
+# AcreetionOS-XLibre Plymouth Theme Script
 
 # Load the background image
-background_image = Image("acreetion.png");
+background_image = Image("xlibre.png");
 screen_width = Window.GetWidth();
 screen_height = Window.GetHeight();
 

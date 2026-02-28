@@ -107,7 +107,7 @@
         "description": "Text",
         "tooltip": "Enter custom text to show in the panel.",
         "dependency": "menu-custom",
-        "value": "Acreetion OS"
+        "value": "AcreetionOS-XL"
     },
     "show-category-icons": {
         "type": "switch",

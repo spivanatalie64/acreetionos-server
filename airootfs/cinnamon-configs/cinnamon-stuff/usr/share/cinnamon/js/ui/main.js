@@ -285,7 +285,7 @@ function start() {
 
     let cinnamonStartTime = new Date().getTime();
 
-    log(`About to start Cinnamon (${Meta.is_wayland_compositor() ? "Wayland" : "XLibre"} backend)`);
+    log(`About to start Cinnamon (${Meta.is_wayland_compositor() ? "Wayland" : "AcreetionOS-XLibre"} backend)`);
 
     let backend = Meta.get_backend();
 

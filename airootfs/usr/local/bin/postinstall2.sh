@@ -1,4 +1,4 @@
-# post script for  acreetion os cinnamon edition
+# post script for xlibre os cinnamon edition
 # written by: Darren Clift
 # copyright (C) 2025
 
@@ -23,8 +23,8 @@ chown -R $name:$name /middle.png
 
 cp -r /cinnamon-configs/.bashrc /home/$name/.bashrc
 cp -r /cinnamon-configs/.bashrc /root
-cp -r /cinnamon-configs/AcreetionOS.txt /root
-cp -r /cinnamon-configs/AcreetionOS.txt /home/$name/AcreetionOS.txt
+cp -r /cinnamon-configs/AcreetionOS-XLibre.txt /root
+cp -r /cinnamon-configs/AcreetionOS-XLibre.txt /home/$name/AcreetionOS-XLibre.txt
 cp -r /backgrounds /usr/share/backgrounds
 cp /etc/pacman2.conf pacman.conf
 cp /mkinitcpio/mkinitcpio.conf /etc/mkinitcpio.conf
