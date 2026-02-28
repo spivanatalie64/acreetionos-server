@@ -14,7 +14,7 @@
 #
 ##############################################################################
 
-echo "Starting AcreetionOS-XLibre post-installation configuration..."
+echo "Starting Acreetion OS post-installation configuration..."
 
 name=$(ls -1 /home)
 echo "Configuring system for user: $name"
@@ -38,16 +38,16 @@ chown -R $name:$name /middle.png
 echo "Copying shell and system configuration files..."
 cp -r /cinnamon-configs/.bashrc /home/$name/.bashrc
 cp -r /cinnamon-configs/.bashrc /root
-cp -r /cinnamon-configs/AcreetionOS-XLibre.txt /root
-cp -r /cinnamon-configs/AcreetionOS-XLibre.txt /home/$name/AcreetionOS-XLibre.txt
+cp -r /cinnamon-configs/AcreetionOS.txt /root
+cp -r /cinnamon-configs/AcreetionOS.txt /home/$name/AcreetionOS.txt
 
 echo "Configuring system DNS and file attributes..."
 mv /resolv.conf /etc/resolv.conf
 chattr +i /etc/resolv.conf
 chattr +i /etc/os-release
 
-echo "Copying AcreetionOS-XLibre documentation..."
-cp /cinnamon-configs/AcreetionOS-XLibre.txt /home/$name/
+echo "Copying Acreetion OS documentation..."
+cp /cinnamon-configs/AcreetionOS.txt /home/$name/
 
 echo "Setting up system backgrounds..."
 mkdir -p /usr/share/backgrounds
@@ -75,4 +75,4 @@ echo "Cleaning up temporary files..."
 rm -rf /mkinitcpio
 rm -rf cinnamon-configs
 
-echo "AcreetionOS-XLibre post-installation configuration completed successfully!"
+echo "Acreetion OS post-installation configuration completed successfully!"

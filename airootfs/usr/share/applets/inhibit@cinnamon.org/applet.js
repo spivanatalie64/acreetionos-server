@@ -115,10 +115,10 @@ class InhibitSwitch extends PopupMenu.PopupBaseMenuItem {
         if (current_state & INHIBIT_IDLE_FLAG ||
             current_state & INHIBIT_SLEEP_FLAG) {
             this._applet.icon.toggleInhibitStatus(true);
-            this._applet.set_applet_tooltip(_("Power management: Inhibited"));
+            this._applet.set_applet_tooltip(_("Power management: inhibited"));
         } else {
             this._applet.icon.toggleInhibitStatus(false);
-            this._applet.set_applet_tooltip(_("Power management: Active"));
+            this._applet.set_applet_tooltip(_("Power management: active"));
         }
 
         if (current_state >= INHIBIT_SLEEP_FLAG && !this.sessionCookie) {
@@ -478,11 +478,7 @@ class CinnamonInhibitApplet extends Applet.IconApplet {
             "inhibit-symbolic" :
             "inhibit-active-symbolic";
 
-        let _text = this.inhibitSwitch._switch.state ?
-            _("Power management: Active") :
-            _("Power management: Inhibited");
-
-        Main.osdWindowManager.show(-1, Gio.ThemedIcon.new(_symbol), _text);
+        Main.osdWindowManager.show(-1, Gio.ThemedIcon.new(_symbol));
     }
 
     toggle_inhibit_notifications() {
@@ -492,11 +488,7 @@ class CinnamonInhibitApplet extends Applet.IconApplet {
             "inhibit-notification-symbolic" :
             "inhibit-notification-active-symbolic";
 
-        let _text = this.notificationsSwitch._switch.state ?
-            _("Notifications: Active") :
-            _("Notifications: Inhibited");
-
-        Main.osdWindowManager.show(-1, Gio.ThemedIcon.new(_symbol), _text);
+        Main.osdWindowManager.show(-1, Gio.ThemedIcon.new(_symbol));
     }
 
     get inhibitors() {

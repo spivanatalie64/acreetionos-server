@@ -20,6 +20,7 @@
  * Author: David Zeuthen <davidz@redhat.com>
  */
 
+const Lang = imports.lang;
 const Signals = imports.signals;
 const Cinnamon = imports.gi.Cinnamon;
 const AccountsService = imports.gi.AccountsService;
@@ -27,278 +28,167 @@ const Clutter = imports.gi.Clutter;
 const St = imports.gi.St;
 const Pango = imports.gi.Pango;
 const Gio = imports.gi.Gio;
-const GObject = imports.gi.GObject;
-const GLib = imports.gi.GLib;
 const Mainloop = imports.mainloop;
 const Polkit = imports.gi.Polkit;
 const PolkitAgent = imports.gi.PolkitAgent;
 
-const Dialog = imports.ui.dialog;
-const Main = imports.ui.main;
 const ModalDialog = imports.ui.modalDialog;
 const CinnamonEntry = imports.ui.cinnamonEntry;
-const PopupMenu = imports.ui.popupMenu;
 const UserWidget = imports.ui.userWidget;
-const Util = imports.misc.util;
 
 const DIALOG_ICON_SIZE = 64;
-const DELAYED_RESET_TIMEOUT = 200;
 
-var AdminUser = class {
-    constructor(user) {
-        this._user = user;
-        this._userName = null;
-        this._realName = null;
-        this._avatar = null;
+function AuthenticationDialog(actionId, message, cookie, userNames) {
+    this._init(actionId, message, cookie, userNames);
+}
 
-        this._avatar = new UserWidget.Avatar(this._user, {
-            iconSize: DIALOG_ICON_SIZE,
-        });
-        this._avatar.x_align = Clutter.ActorAlign.CENTER;
-        this._avatar.visible = false;
+AuthenticationDialog.prototype = {
+    __proto__: ModalDialog.ModalDialog.prototype,
 
-        this._userLoadedId = this._user.connect('notify::is-loaded',
-            this._onUserChanged.bind(this));
-        this._userChangedId = this._user.connect('changed',
-            this._onUserChanged.bind(this));
-        this._onUserChanged();
-    }
-
-    get avatar() {
-        return this._avatar;
-    }
-
-    get realName() {
-        return this._realName;
-    }
-
-    get userName() {
-        return this._userName;
-    }
-
-    _onUserChanged() {
-        if (!this._user.is_loaded)
-            return;
-
-        this._userName = this._user.get_user_name();
-        this._realName = this._user.get_real_name();
-
-        this._avatar.update();
-    }
-
-    destroy() {
-        if (this._user) {
-            this._user.disconnect(this._userLoadedId);
-            this._user.disconnect(this._userChangedId);
-            this._user = null;
-        }
-    }
-};
-
-var AuthenticationDialog = GObject.registerClass({
-    Signals: { 'done': { param_types: [GObject.TYPE_BOOLEAN] } }
-}, class AuthenticationDialog extends ModalDialog.ModalDialog {
-    _init(actionId, description, cookie, userNames) {
-        super._init({ styleClass: 'prompt-dialog' });
+    _init: function(actionId, message, cookie, userNames) {
+        ModalDialog.ModalDialog.prototype._init.call(this, { styleClass: 'polkit-dialog' });
 
         this.actionId = actionId;
-        this._cookie = cookie;
-        this.message = description;
+        this.message = message;
         this.userNames = userNames;
         this._wasDismissed = false;
-        this._user = null;
-        this._visibleAvatar = null;
-        this._adminUsers = [];
+        this._completed = false;
 
-        this.connect('closed', this._onDialogClosed.bind(this));
+        let mainContentBox = new St.BoxLayout({ style_class: 'polkit-dialog-main-layout',
+                                                vertical: true });
+        this.contentLayout.add(mainContentBox,
+                               { x_fill: true,
+                                 y_fill: true });
 
-        let title = _("Authentication Required");
+        this._subjectLabel = new St.Label({ style_class: 'polkit-dialog-headline',
+                                            text: _("Authentication Required") });
 
-        let headerContent = new Dialog.MessageDialogContent({ title, description });
-        this.contentLayout.add_child(headerContent);
+        mainContentBox.add(this._subjectLabel,
+                       { y_fill:  false,
+                         y_align: St.Align.MIDDLE });
 
-        let bodyContent = new Dialog.MessageDialogContent();
+        this._descriptionLabel = new St.Label({ style_class: 'polkit-dialog-description',
+                                                text: message });
+        this._descriptionLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        this._descriptionLabel.clutter_text.line_wrap = true;
 
-        this._accountsService = AccountsService.UserManager.get_default();
-        this._accountsService.list_users();
+        mainContentBox.add(this._descriptionLabel,
+                       { y_fill:  true,
+                         y_align: St.Align.START });
 
-        let userBox = new St.BoxLayout({
-            style_class: 'polkit-dialog-user-layout',
-            important: true,
-            vertical: true,
-        });
-        bodyContent.add_child(userBox);
-
-        this._userCombo = new St.Button({
-            style_class: 'polkit-dialog-user-combo',
-        });
-        this._userCombo.connect('clicked', this._onUserComboClicked.bind(this));
-
-        const menuManager = new PopupMenu.PopupMenuManager({ actor: this._userCombo });
-        this._menu = new PopupMenu.PopupMenu(this._userCombo, St.Side.TOP);
-        Main.uiGroup.add_actor(this._menu.actor);
-        this._menu.actor.hide();
-        menuManager.addMenu(this._menu);
-
-        // Collect all available users and populate the menu
-        for (const name of userNames) {
-            let adminUser = new AdminUser(this._accountsService.get_user(name));
-            this._adminUsers.push(adminUser);
-
-            userBox.add(adminUser.avatar, { x_fill: false });
-
-            if (adminUser.realName !== null) {
-                const realName = adminUser.realName;
-                const userName = adminUser.userName;
-                const item = new PopupMenu.PopupMenuItem(`${realName} (${userName})`);
-                item.connect('activate', () => {
-                    this._user = adminUser;
-                    this._updateUser();
-                    this._wasDismissed = true;
-                    this.performAuthentication();
-                });
-                this._menu.addMenuItem(item);
-            }
+        if (userNames.length > 1) {
+            log('polkitAuthenticationAgent: Received ' + userNames.length +
+                ' identities that can be used for authentication. Only ' +
+                'considering the first one.');
         }
 
-        // If the current user is an admin, set the current user
-        let userFound = false;
-        const currentUser = GLib.get_user_name();
-        this._adminUsers.forEach(user => {
-            if (user.userName === currentUser) {
-                this._user = user;
-                this._updateUser();
-                userFound = true;
-            }
-        });
+        let userName = userNames[0];
 
-        // If the current user is not an admin, set the first user
-        // as the active one. If there is more than a single user,
-        // show the combo
-        if (!userFound) {
-            this._user = this._adminUsers[0];
-            this._updateUser();
-            this._userCombo.reactive = userNames.length > 1;
+        this._user = AccountsService.UserManager.get_default().get_user(userName);
+        let userRealName = this._user.get_real_name()
+        this._userLoadedId = this._user.connect('notify::is_loaded',
+                                                Lang.bind(this, this._onUserChanged));
+        this._userChangedId = this._user.connect('changed',
+                                                 Lang.bind(this, this._onUserChanged));
+
+        // Special case 'root'
+        let userIsRoot = false;
+        if (userName == 'root') {
+            userIsRoot = true;
+            userRealName = _("Administrator");
         }
 
-        userBox.add(this._userCombo, { x_fill: false });
+        if (userIsRoot) {
+            let userLabel = new St.Label(({ style_class: 'polkit-dialog-user-root-label',
+                                            text: userRealName }));
+            mainContentBox.add(userLabel);
+        } else {
+            let userBox = new St.BoxLayout({ style_class: 'polkit-dialog-user-layout',
+                                             vertical: true });
+            mainContentBox.add(userBox);
+            this._userIcon = new UserWidget.Avatar(this._user, { iconSize: DIALOG_ICON_SIZE });
+            this._userIcon.hide();
+            userBox.add(this._userIcon,
+                        { x_fill:  false,
+                          y_fill:  true,
+                          x_align: St.Align.MIDDLE,
+                          y_align: St.Align.START });
+            let userLabel = new St.Label(({ style_class: 'polkit-dialog-user-label',
+                                            text: userRealName }));
+            userBox.add(userLabel,
+                        { x_fill:  false,
+                          y_fill:  true,
+                          x_align: St.Align.MIDDLE,
+                          y_align: St.Align.START });
+        }
 
-        let passwordBox = new St.BoxLayout({
-            style_class: 'prompt-dialog-password-layout',
-            vertical: true,
-        });
+        this._onUserChanged();
 
-        this._passwordEntry = new St.PasswordEntry({
-            style_class: 'prompt-dialog-password-entry',
-            text: "",
-            can_focus: true,
-            visible: false,
-            x_align: Clutter.ActorAlign.CENTER,
-        });
-        CinnamonEntry.addContextMenu(this._passwordEntry);
-        this._passwordEntry.clutter_text.connect('activate', this._onEntryActivate.bind(this));
-        this._passwordEntry.bind_property('reactive',
-            this._passwordEntry.clutter_text, 'editable',
-            GObject.BindingFlags.SYNC_CREATE);
-        passwordBox.add_child(this._passwordEntry);
+        this._passwordBox = new St.BoxLayout({ vertical: false });
+        mainContentBox.add(this._passwordBox);
+        this._passwordLabel = new St.Label(({ style_class: 'polkit-dialog-password-label' }));
+        this._passwordBox.add(this._passwordLabel,
+                              { y_align: St.Align.MIDDLE });
+        this._passwordEntry = new St.Entry({ style_class: 'polkit-dialog-password-entry',
+                                             text: "",
+                                             can_focus: true});
+        CinnamonEntry.addContextMenu(this._passwordEntry, { isPassword: true });
+        this._passwordEntry.clutter_text.connect('activate', Lang.bind(this, this._onEntryActivate));
+        this._passwordBox.add(this._passwordEntry,
+                              { expand: true,
+                                y_align: St.Align.START });
+        this.setInitialKeyFocus(this._passwordEntry);
+        this._passwordBox.hide();
 
-        let warningBox = new St.BoxLayout({ vertical: true });
-
-        let capsLockWarning = new CinnamonEntry.CapsLockWarning();
-        this._passwordEntry.bind_property('visible',
-            capsLockWarning, 'visible',
-            GObject.BindingFlags.SYNC_CREATE);
-        warningBox.add_child(capsLockWarning);
-
-        this._errorMessageLabel = new St.Label({
-            style_class: 'prompt-dialog-error-label',
-            visible: false,
-        });
+        this._errorMessageLabel = new St.Label({ style_class: 'polkit-dialog-error-label' });
         this._errorMessageLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._errorMessageLabel.clutter_text.line_wrap = true;
+        mainContentBox.add(this._errorMessageLabel);
+        this._errorMessageLabel.hide();
 
-        warningBox.add_child(this._errorMessageLabel);
-
-        this._infoMessageLabel = new St.Label({
-            style_class: 'prompt-dialog-info-label',
-            visible: false,
-        });
+        this._infoMessageLabel = new St.Label({ style_class: 'polkit-dialog-info-label' });
         this._infoMessageLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._infoMessageLabel.clutter_text.line_wrap = true;
-
-        warningBox.add_child(this._infoMessageLabel);
+        mainContentBox.add(this._infoMessageLabel);
+        this._infoMessageLabel.hide();
 
         /* text is intentionally non-blank otherwise the height is not the same as for
          * infoMessage and errorMessageLabel - but it is still invisible because
          * cinnamon.css sets the color to be transparent
          */
-        this._nullMessageLabel = new St.Label({ style_class: 'prompt-dialog-null-label' });
+        this._nullMessageLabel = new St.Label({ style_class: 'polkit-dialog-null-label',
+                                                text: 'abc'});
         this._nullMessageLabel.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
         this._nullMessageLabel.clutter_text.line_wrap = true;
+        mainContentBox.add(this._nullMessageLabel);
+        this._nullMessageLabel.show();
 
-        warningBox.add_child(this._nullMessageLabel);
-
-        passwordBox.add_child(warningBox);
-        bodyContent.add_child(passwordBox);
-
-        this._cancelButton = this.addButton({
-            label: _("Cancel"),
-            action: this.cancel.bind(this),
-            key: Clutter.KEY_Escape
-        });
-        this._okButton = this.addButton({
-            label:  _("Authenticate"),
-            action: this._onAuthenticateButtonPressed.bind(this),
-            reactive: false,
-            default: true
-        });
-        this._okButton.bind_property('reactive',
-            this._okButton, 'can-focus',
-            GObject.BindingFlags.SYNC_CREATE);
-
-        this._passwordEntry.clutter_text.connect('text-changed', text => {
-            this._okButton.reactive = text.get_text().length > 0;
-        });
-
-        this.contentLayout.add_child(bodyContent);
+        this.setButtons([{ label: _("Cancel"),
+                           action: Lang.bind(this, this.cancel),
+                           key:    Clutter.Escape
+                         },
+                         { label:  _("Authenticate"),
+                           action: Lang.bind(this, this._onAuthenticateButtonPressed)
+                         }]);
 
         this._doneEmitted = false;
-    }
 
-    _onUserComboClicked() {
-        this._menu.toggle();
-    }
+        this._identityToAuth = Polkit.UnixUser.new_for_name(userName);
+        this._cookie = cookie;
 
-    _updateUser() {
-        global.log("Updating user");
-        this._adminUsers.forEach(user => {
-            if (user != this._user) {
-                user.avatar.visible = false;
-            } else {
-                user.avatar.visible = true;
-                this._userCombo.set_label(this._user.realName);
-                this._identityToAuth = Polkit.UnixUser.new_for_name(user.userName);
-            }
-        });
+        this._session = new PolkitAgent.Session({ identity: this._identityToAuth,
+                                                  cookie: this._cookie });
+        this._session.connect('completed', Lang.bind(this, this._onSessionCompleted));
+        this._session.connect('request', Lang.bind(this, this._onSessionRequest));
+        this._session.connect('show-error', Lang.bind(this, this._onSessionShowError));
+        this._session.connect('show-info', Lang.bind(this, this._onSessionShowInfo));
+    },
 
-        if (this._errorMessageLabel)
-            this._errorMessageLabel.set_text("");
-    }
-
-    performAuthentication() {
-        this._destroySession(DELAYED_RESET_TIMEOUT);
-        this._session = new PolkitAgent.Session({
-            identity: this._identityToAuth,
-            cookie: this._cookie
-        });
-        this._sessionCompletedId = this._session.connect('completed', this._onSessionCompleted.bind(this));
-        this._sessionRequestId = this._session.connect('request', this._onSessionRequest.bind(this));
-        this._sessionShowErrorId = this._session.connect('show-error', this._onSessionShowError.bind(this));
-        this._sessionShowInfoId = this._session.connect('show-info', this._onSessionShowInfo.bind(this));
+    startAuthentication: function() {
         this._session.initiate();
-    }
+    },
 
-    _ensureOpen() {
+    _ensureOpen: function() {
         // NOTE: ModalDialog.open() is safe to call if the dialog is
         // already open - it just returns true without side-effects
         if (!this.open(global.get_current_time())) {
@@ -316,47 +206,38 @@ var AuthenticationDialog = GObject.registerClass({
             log('polkitAuthenticationAgent: Failed to show modal dialog.' +
                 ' Dismissing authentication request for action-id ' + this.actionId +
                 ' cookie ' + this._cookie);
-            this._emitDone(true);
+            this._emitDone(false, true);
         }
-    }
+    },
 
-    _emitDone(dismissed) {
+    _emitDone: function(keepVisible, dismissed) {
         if (!this._doneEmitted) {
             this._doneEmitted = true;
-            this.emit('done', dismissed);
+            this.emit('done', keepVisible, dismissed);
         }
-    }
+    },
 
-    _onEntryActivate() {
+    _onEntryActivate: function() {
         let response = this._passwordEntry.get_text();
-        if (response.length === 0)
-            return;
-
-        this._passwordEntry.reactive = false;
-        this._okButton.reactive = false;
-
         this._session.response(response);
         // When the user responds, dismiss already shown info and
         // error texts (if any)
         this._errorMessageLabel.hide();
         this._infoMessageLabel.hide();
         this._nullMessageLabel.show();
-    }
+    },
 
-    _onAuthenticateButtonPressed() {
+    _onAuthenticateButtonPressed: function() {
         this._onEntryActivate();
-    }
+    },
 
-    _onSessionCompleted(session, gainedAuthorization) {
-        if (this._completed || this._doneEmitted)
+    _onSessionCompleted: function(session, gainedAuthorization) {
+        if (this._completed)
             return;
 
         this._completed = true;
 
-        if (gainedAuthorization) {
-            this._emitDone(false);
-
-        } else {
+        if (!gainedAuthorization) {
             /* Unless we are showing an existing error message from the PAM
              * module (the PAM module could be reporting the authentication
              * error providing authentication-method specific information),
@@ -371,125 +252,89 @@ var AuthenticationDialog = GObject.registerClass({
                 this._errorMessageLabel.show();
                 this._infoMessageLabel.hide();
                 this._nullMessageLabel.hide();
-
-                Util.wiggle(this._passwordEntry);
             }
-
-            this._wasDismissed = false;
-
-            /* Try and authenticate again */
-            this.performAuthentication();
         }
-    }
+        this._emitDone(!gainedAuthorization, false);
+    },
 
-    _onSessionRequest(session, request, echoOn) {
-        if (this._sessionRequestTimeoutId) {
-            GLib.source_remove(this._sessionRequestTimeoutId);
-            this._sessionRequestTimeoutId = 0;
-        }
-
+    _onSessionRequest: function(session, request, echo_on) {
         // Cheap localization trick
-        if (request === 'Password:' || request === 'Password: ')
-            this._passwordEntry.hint_text = _("Password");
+        if (request == 'Password:')
+            this._passwordLabel.set_text(_("Password:"));
         else
-            this._passwordEntry.hint_text = request;
+            this._passwordLabel.set_text(request);
 
-        this._passwordEntry.password_visible = echoOn;
+        if (echo_on)
+            this._passwordEntry.clutter_text.set_password_char('');
+        else
+            this._passwordEntry.clutter_text.set_password_char('\u25cf'); // ● U+25CF BLACK CIRCLE
 
-        this._passwordEntry.show();
+        this._passwordBox.show();
         this._passwordEntry.set_text('');
-        this._passwordEntry.reactive  = true;
-        this._okButton.reactive = false;
-
-        this._ensureOpen();
         this._passwordEntry.grab_key_focus();
-    }
+        this._ensureOpen();
+    },
 
-    _onSessionShowError(session, text) {
+    _onSessionShowError: function(session, text) {
         this._passwordEntry.set_text('');
         this._errorMessageLabel.set_text(text);
         this._errorMessageLabel.show();
         this._infoMessageLabel.hide();
         this._nullMessageLabel.hide();
         this._ensureOpen();
-    }
+    },
 
-    _onSessionShowInfo(session, text) {
+    _onSessionShowInfo: function(session, text) {
         this._passwordEntry.set_text('');
         this._infoMessageLabel.set_text(text);
         this._infoMessageLabel.show();
         this._errorMessageLabel.hide();
         this._nullMessageLabel.hide();
         this._ensureOpen();
-    }
+    },
 
-    _destroySession(delay = 0) {
+    destroySession: function() {
         if (this._session) {
             if (!this._completed)
                 this._session.cancel();
-            this._completed = false;
-
-            this._session.disconnect(this._sessionCompletedId);
-            this._session.disconnect(this._sessionRequestId);
-            this._session.disconnect(this._sessionShowErrorId);
-            this._session.disconnect(this._sessionShowInfoId);
             this._session = null;
         }
+    },
 
-        if (this._sessionRequestTimeoutId) {
-            GLib.source_remove(this._sessionRequestTimeoutId);
-            this._sessionRequestTimeoutId = 0;
+    _onUserChanged: function() {
+        if (this._user.is_loaded) {
+            if (this._userIcon) {
+                this._userIcon.update();
+                this._userIcon.show();
+            }
         }
+    },
 
-        let resetDialog = () => {
-            if (this.state != ModalDialog.State.OPENED)
-                return;
-
-            this._passwordEntry.hide();
-            this._cancelButton.grab_key_focus();
-            this._okButton.reactive = false;
-        };
-
-        if (delay) {
-            this._sessionRequestTimeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, resetDialog);
-            GLib.Source.set_name_by_id(this._sessionRequestTimeoutId, '[cinnamon] this._sessionRequestTimeoutId');
-        } else {
-            resetDialog();
-        }
-    }
-
-    cancel() {
+    cancel: function() {
         this._wasDismissed = true;
         this.close(global.get_current_time());
-        this._emitDone(true);
-    }
+        this._emitDone(false, true);
+    },
 
-    _onDialogClosed() {
-        if (this._sessionRequestTimeoutId)
-            GLib.source_remove(this._sessionRequestTimeoutId);
-        this._sessionRequestTimeoutId = 0;
+};
+Signals.addSignalMethods(AuthenticationDialog.prototype);
 
-        this._adminUsers.forEach(user => {
-            user.destroy();
-        });
-        this._adminUsers = [];
+function AuthenticationAgent() {
+    this._init();
+}
 
-        this._destroySession();
-    }
-
-});
-
-var AuthenticationAgent = class {
-    constructor() {
+AuthenticationAgent.prototype = {
+    _init: function() {
         this._native = new Cinnamon.PolkitAuthenticationAgent();
-        this._native.connect('initiate', this._onInitiate.bind(this));
-        this._native.connect('cancel', this._onCancel.bind(this));
+        this._native.connect('initiate', Lang.bind(this, this._onInitiate));
+        this._native.connect('cancel', Lang.bind(this, this._onCancel));
         // TODO - maybe register probably should wait until later, especially at first login?
         this._native.register();
         this._currentDialog = null;
-    }
+        this._isCompleting = false;
+    },
 
-    _onInitiate(nativeAgent, actionId, message, iconName, cookie, userNames) {
+    _onInitiate: function(nativeAgent, actionId, message, iconName, cookie, userNames) {
         this._currentDialog = new AuthenticationDialog(actionId, message, cookie, userNames);
 
         // We actually don't want to open the dialog until we know for
@@ -502,23 +347,44 @@ var AuthenticationAgent = class {
         // See https://bugzilla.gnome.org/show_bug.cgi?id=643062 for more
         // discussion.
 
-        this._currentDialog.connect('done', this._onDialogDone.bind(this));
-        this._currentDialog.performAuthentication();
-    }
+        this._currentDialog.connect('done', Lang.bind(this, this._onDialogDone));
+        this._currentDialog.startAuthentication();
+    },
 
-    _onCancel(nativeAgent) {
-        this._completeRequest(false);
-    }
+    _onCancel: function(nativeAgent) {
+        this._completeRequest(false, false);
+    },
 
-    _onDialogDone(dialog, dismissed) {
-        this._completeRequest(dismissed);
-    }
+    _onDialogDone: function(dialog, keepVisible, dismissed) {
+        this._completeRequest(keepVisible, dismissed);
+    },
 
-    _completeRequest(dismissed) {
+    _reallyCompleteRequest: function(dismissed) {
         this._currentDialog.close();
+        this._currentDialog.destroySession();
         this._currentDialog = null;
+        this._isCompleting = false;
 
-        this._native.complete(dismissed);
+        this._native.complete(dismissed)
+    },
+
+    _completeRequest: function(keepVisible, wasDismissed) {
+        if (this._isCompleting)
+            return;
+
+        this._isCompleting = true;
+
+        if (keepVisible) {
+            // Give the user 2 seconds to read 'Authentication Failure' before
+            // dismissing the dialog
+            Mainloop.timeout_add(2000,
+                                 Lang.bind(this,
+                                           function() {
+                                               this._reallyCompleteRequest(wasDismissed);
+                                           }));
+        } else {
+            this._reallyCompleteRequest(wasDismissed);
+        }
     }
 }
 

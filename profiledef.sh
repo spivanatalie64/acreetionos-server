@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 
-iso_name="AcreetionOS-XLibre"
-iso_label="AcreetionOS-XL_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
-iso_publisher="AcreetionOS Project"
-iso_application="AcreetionOS XLibre Edition Install Media"
+iso_name="AcreetionOS"
+iso_label="AcreetionOS_$(date --date="@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y%m)"
+iso_publisher="Acreetion OS Project"
+iso_application="Acreetion OS Install Media"
 iso_version="1.0"
 install_dir="arch"
 buildmodes=('iso')
@@ -36,5 +36,5 @@ file_permissions=(
   ["/usr/local/bin/stormos-final"]="0:0:755"
   ["/usr/bin/wifi-connection"]="0:0:755"
   ["/usr/local/bin/setup-displays.sh"]="0:0:755"
-  ["/usr/bin/xlibre-welcome.sh"]="0:0:755"
+  ["/usr/bin/acreetionos-welcome.sh"]="0:0:755"
 )

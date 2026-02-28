@@ -131,24 +131,19 @@ A11yHandler.prototype = {
 
     popup_state_osd: function(key, state) {
         let icon = null;
-        let text = null;
 
         switch (key) {
             case CAPS:
                 icon = Gio.ThemedIcon.new(state ? "cinnamon-caps-lock-symbolic" :
                                                   "cinnamon-caps-lock-off-symbolic");
-                text = state ? _("Caps Lock On"):
-                               _("Caps Lock Off");
                 break;
             case NUM:
                 icon = Gio.ThemedIcon.new(state ? "cinnamon-num-lock-symbolic" :
                                                   "cinnamon-num-lock-off-symbolic");
-                text = state ? _("Number Lock On"):
-                               _("Number Lock Off");
                 break;
         }
 
-        Main.osdWindowManager.show(-1, icon, text, null);
+        Main.osdWindowManager.show(-1, icon, undefined);        
     },
 
     play_state_sound: function(key, state) {

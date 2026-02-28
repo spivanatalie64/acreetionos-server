@@ -22,6 +22,13 @@ sit amet lobortis. Donec sit amet nisi turpis. Morbi aliquet \
 aliquam ullamcorper.
 """
 
+MEDIA_KEYS_OSD_SIZES = [
+    ("disabled", _("Disabled")),
+    ("small", _("Small")),
+    ("medium", _("Medium")),
+    ("large", _("Large"))
+]
+
 NOTIFICATION_DISPLAY_SCREENS = [
     ("primary-screen", _("Primary monitor")),
     ("active-screen", _("Active monitor")),
@@ -69,9 +76,6 @@ class Module:
         spin.revealer.settings = Gio.Settings("org.cinnamon.desktop.notifications")
         spin.revealer.settings.bind_with_mapping("notification-screen-display", spin.revealer, "reveal-child", Gio.SettingsBindFlags.GET, lambda option: option == "fixed-screen", None)
 
-        switch = GSettingsSwitch(_("Display notifications over fullscreen windows"), "org.cinnamon.desktop.notifications", "fullscreen-notifications")
-        settings.add_reveal_row(switch, "org.cinnamon.desktop.notifications", "display-notifications")
-
         spin = GSettingsSpinButton(_("Notification duration"), "org.cinnamon.desktop.notifications", "notification-duration", _("seconds"), 1, 60, 1, 1)
         settings.add_reveal_row(spin, "org.cinnamon.desktop.notifications", "display-notifications")
 
@@ -80,8 +84,8 @@ class Module:
 
         settings = page.add_section(_("Media keys OSD"))
 
-        switch = GSettingsSwitch(_("Show media keys OSD"), "org.cinnamon", "show-media-keys-osd")
-        settings.add_row(switch)
+        combo = GSettingsComboBox(_("Media keys OSD size"), "org.cinnamon", "show-media-keys-osd", MEDIA_KEYS_OSD_SIZES)
+        settings.add_row(combo)
 
     def send_test(self, widget):
         n = Notify.Notification.new("This is a test notification", content, "dialog-warning")

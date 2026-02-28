@@ -1,20 +1,19 @@
-// -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
-
-const Clutter = imports.gi.Clutter;
-const Gdk = imports.gi.Gdk;
-const Gio = imports.gi.Gio;
-const GLib = imports.gi.GLib;
-const GObject = imports.gi.GObject;
-const Meta = imports.gi.Meta;
 const St = imports.gi.St;
-
-const BarLevel = imports.ui.barLevel;
-const Layout = imports.ui.layout;
+const Clutter = imports.gi.Clutter;
+const Lang = imports.lang;
 const Main = imports.ui.main;
+const Mainloop = imports.mainloop;
+const Tweener = imports.ui.tweener;
+const Gio = imports.gi.Gio;
+const Gdk = imports.gi.Gdk;
+const Meta = imports.gi.Meta;
+const Cinnamon = imports.gi.Cinnamon;
 
-const LEVEL_ANIMATION_TIME = 100;
-const FADE_TIME = 100;
+const LEVEL_ANIMATION_TIME = 0.1;
+const FADE_TIME = 0.1;
 const HIDE_TIMEOUT = 1500;
+
+const OSD_SIZE = 110;
 
 function convertGdkIndex(monitorIndex) {
     let screen = Gdk.Screen.get_default();
@@ -31,190 +30,279 @@ function convertGdkIndex(monitorIndex) {
     return monitorIndex;
 };
 
-var OsdWindow = GObject.registerClass(
-class OsdWindow extends Clutter.Actor {
-    _init(monitorIndex) {
-        super._init({
-            x_expand: true,
-            y_expand: true,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.END,
-        });
+function LevelBar() {
+    this._init();
+}
+
+LevelBar.prototype = {
+    _init: function() {
+        this._level = 0;
+
+        this.initial = true;
+
+        this.actor = new Cinnamon.GenericContainer({ style_class: 'level',
+                                                     x_align: St.Align.START,
+                                                     important: true });
+        this.actor.connect("allocate", this._allocate_bar.bind(this));
+
+        this._bar = new St.Widget({ style_class: 'level-bar',
+                                    important: true });
+        this.actor.add_actor(this._bar);
+    },
+
+    _allocate_bar: function(actor, box, flags) {
+        let level_box = box.copy();
+
+        let new_width = (level_box.x2 - level_box.x1) * (this._level / 100);
+        level_box.x2 = Math.min((level_box.x1 + new_width), box.x2);
+        this._bar.allocate(level_box, flags);
+    },
+
+    get level() {
+        return this._level;
+    },
+
+    set level(value) {
+        this._level = Math.max(0, Math.min(value, 100));
+
+        let newWidth = this.actor.width * (this._level / 100);
+
+        if (newWidth != this._bar.width) {
+            this._bar.width = newWidth;
+        }
+
+        this.actor.queue_redraw();
+    },
+
+    setLevelBarHeight: function(sizeMultiplier) {
+        let themeNode = this.actor.get_theme_node();
+        let height = themeNode.get_height();
+        let newHeight = Math.floor(height * sizeMultiplier);
+        this.actor.set_height(newHeight);
+    }
+};
+
+function OsdWindow(monitorIndex, size) {
+    this._init(monitorIndex, size);
+}
+
+OsdWindow.prototype = {
+    _init: function(monitorIndex, size) {
+        this._popupSize = 0;
+        this._osdBaseSize = null;
 
         this._monitorIndex = monitorIndex;
-        let constraint = new Layout.MonitorConstraint({
-            index: monitorIndex,
-            work_area: true,
-        });
-        this.add_constraint(constraint);
 
-        this._hbox = new St.BoxLayout({
-            style_class: 'media-keys-osd',
-            important: true,
-            x_align: Clutter.ActorAlign.CENTER,
-        });
-        this.add_actor(this._hbox);
+        this.actor = new St.BoxLayout({ style_class: 'osd-window',
+                                       vertical: true,
+                                       important: true });
 
-        this._icon = new St.Icon({ y_expand: true });
-        this._hbox.add_child(this._icon);
+        this._icon = new St.Icon();
+        this.actor.add(this._icon, { expand: true });
 
-        this._vbox = new St.BoxLayout({
-            vertical: true,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._hbox.add_child(this._vbox);
-
+        this._level = new LevelBar();
+        this.actor.add(this._level.actor);
+        
         this._label = new St.Label();
-        this._vbox.add_child(this._label);
-
-        this._level = new BarLevel.BarLevel({
-            style_class: 'level',
-            value: 0,
-        });
-        this._vbox.add_child(this._level);
+        this._label.style = 'font-size: 1.2em; text-align: center;'
+        this.actor.add(this._label);
 
         this._hideTimeoutId = 0;
         this._reset();
-        Main.uiGroup.add_child(this);
-    }
 
-    setIcon(icon) {
+        Main.uiGroup.add_child(this.actor);
+
+        this._sizeAndPosition(size);
+    },
+
+    setIcon: function(icon) {
         this._icon.gicon = icon;
-    }
+    },
 
-    setLabel(label) {
-        this._label.visible = label != null;
-        if (this._label.visible)
-            this._label.text = label;
-    }
+    setLevel: function(level) {
+        if (level != undefined) {
+            this._label.set_text(String(level) + " %");
+            this._label.visible = this._level.actor.visible = true;
 
-    setLevel(value) {
-        this._level.visible = value != null;
-        if (this._level.visible) {
-            value = value / 100;
-            if (this.visible)
-                this._level.ease_property('value', value, {
-                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                    duration: LEVEL_ANIMATION_TIME,
-                });
+            if (this.actor.visible)
+                Tweener.addTween(this._level,
+                                 { level: level,
+                                   time: LEVEL_ANIMATION_TIME,
+                                   transition: 'easeOutQuad' });
             else
-                this._level.value = value;
+                this._level.level = level;
+        } else {
+            this._label.set_text("");
+            this._label.visible = this._level.actor.visible = false;
         }
-    }
+    },
 
-    setMaxLevel(maxLevel = 1) {
-        this._level.maximum_value = maxLevel;
-    }
+    show: function() {
+        if (this._osdBaseSize == null)
+            return;
 
-    show() {
         if (!this._icon.gicon)
             return;
 
-        if (!this.visible) {
+        if (!this.actor.visible) {
             Meta.disable_unredirect_for_display(global.display);
-            super.show();
-            this.opacity = 0;
-            this.get_parent().set_child_above_sibling(this, null);
+            this._level.setLevelBarHeight(this._sizeMultiplier);
+            this.actor.show();
+            this.actor.opacity = 0;
+            this.actor.raise_top();
 
-            this.ease({
-                opacity: 255,
-                duration: FADE_TIME,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            });
+            Tweener.addTween(this.actor,
+                             { opacity: 255,
+                               time: FADE_TIME,
+                               transition: 'easeOutQuad' });
         }
 
         if (this._hideTimeoutId)
-            GLib.source_remove(this._hideTimeoutId);
-        this._hideTimeoutId = GLib.timeout_add(
-            GLib.PRIORITY_DEFAULT, HIDE_TIMEOUT, this._hide.bind(this));
-        GLib.Source.set_name_by_id(this._hideTimeoutId, '[cinnamon] this._hide');
-    }
+            Mainloop.source_remove(this._hideTimeoutId);
+        this._hideTimeoutId = Mainloop.timeout_add(HIDE_TIMEOUT, Lang.bind(this, this._hide));
+    },
 
-    cancel() {
+    cancel: function() {
         if (!this._hideTimeoutId)
             return;
 
-        GLib.source_remove(this._hideTimeoutId);
+        Mainloop.source_remove(this._hideTimeoutId);
         this._hide();
-    }
+    },
 
-    _hide() {
+    _hide: function() {
         this._hideTimeoutId = 0;
-        this.ease({
-            opacity: 0,
-            duration: FADE_TIME,
-            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-            onComplete: () => {
-                this._reset();
-                Meta.enable_unredirect_for_display(global.display);
-            },
-        });
-        return GLib.SOURCE_REMOVE;
-    }
+        Tweener.addTween(this.actor,
+                         { opacity: 0,
+                           time: FADE_TIME,
+                           transition: 'easeOutQuad',
+                           onComplete: Lang.bind(this, function() {
+                               this._reset();
+                               Meta.enable_unredirect_for_display(global.display);
+                           })
+                         });
+    },
 
-    _reset() {
-        super.hide();
-        this.setLabel(null);
-        this.setMaxLevel(null);
-        this.setLevel(null);
-    }
-});
+    _reset: function() {
+        this.actor.hide();
+    },
 
-var OsdWindowManager = class {
-    constructor() {
+    destroy: function() {
+        Main.uiGroup.remove_child(this.actor);
+        this.actor.destroy();
+    },
+
+    _sizeAndPosition: function(sizeFromSettings) {
+        switch (sizeFromSettings) {
+            case "disabled":
+                this._osdBaseSize = null;
+                break;
+            case "small":
+                this._sizeMultiplier = 0.7;
+                this._osdBaseSize = Math.floor(OSD_SIZE * this._sizeMultiplier);
+                break;
+            case "large":
+                this._sizeMultiplier = 1.0;
+                this._osdBaseSize = OSD_SIZE;
+                break;
+            default:
+                this._sizeMultiplier = 0.85;
+                this._osdBaseSize = Math.floor(OSD_SIZE * this._sizeMultiplier);
+        }
+
+        let monitor = Main.layoutManager.monitors[this._monitorIndex];
+        if (monitor) {
+            let scaleW = monitor.width / 640.0;
+            let scaleH = monitor.height / 480.0;
+            let scale = Math.min(scaleW, scaleH);
+            this._popupSize = this._osdBaseSize * Math.max(1, scale);
+
+            let scaleFactor = global.ui_scale;
+            this._icon.icon_size = this._popupSize / (2 * scaleFactor);
+            this.actor.set_size(this._popupSize, this._popupSize);
+            this.actor.translation_y = (monitor.height + monitor.y) - (this._popupSize + (50 * scaleFactor));
+            this.actor.translation_x = ((monitor.width / 2) + monitor.x) - (this._popupSize / 2);
+
+            if (monitor.height < 900 && ["small", "medium"].includes(sizeFromSettings)) {
+                let spacing = this.actor.get_theme_node().get_length ("spacing");
+                let multiplier = 1.0;
+
+                if (sizeFromSettings === "small") {
+                    this._label.style = 'font-size: 0.8em; text-align: center;'
+                    multiplier = 0.6;
+                } else
+                if (sizeFromSettings === "medium") {
+                    this._label.style = 'font-size: 1.0em; text-align: center;'
+                    multiplier = 0.8;
+                }
+
+                this.actor.style = `spacing: ${Math.floor(spacing * multiplier)}px;`;
+            } else {
+                this._label.style = 'font-size: 1.2em; text-align: center;'
+                this.actor.style = null;
+            }
+        }
+    }
+};
+
+function OsdWindowManager() {
+    this._init();
+}
+
+OsdWindowManager.prototype = {
+    _init: function() {
         this._osdWindows = [];
 
-        Main.layoutManager.connect('monitors-changed', this._layoutChanged.bind(this));
+        Main.layoutManager.connect('monitors-changed', Lang.bind(this, this._layoutChanged));
         this._osdSettings = new Gio.Settings({ schema_id: "org.cinnamon" });
-        this._osdSettings.connect("changed::show-media-keys-osd", this._layoutChanged.bind(this));
+        this._osdSettings.connect("changed::show-media-keys-osd", Lang.bind(this, this._layoutChanged));
 
         this._layoutChanged();
-    }
+    },
 
-    _layoutChanged() {
+    _layoutChanged: function() {
         this._osdWindows.forEach((osd) => {
             osd.destroy();
         })
 
         this._osdWindows = [];
+        let size = this._osdSettings.get_string("show-media-keys-osd");
 
-        if (!this._osdSettings.get_boolean("show-media-keys-osd"))
+        if (size === "disabled")
             return;
 
         for (let i = 0; i < Main.layoutManager.monitors.length; i++) {
-            if (this._osdWindows[i] === undefined)
-                this._osdWindows[i] = new OsdWindow(i);
+            if (this._osdWindows[i] == undefined)
+                this._osdWindows[i] = new OsdWindow(i, size);
         }
-    }
+    },
 
-    _showOsdWindow(monitorIndex, icon, label, level) {
+    _showOsdWindow: function(monitorIndex, icon, level) {
         this._osdWindows[monitorIndex].setIcon(icon);
-        this._osdWindows[monitorIndex].setLabel(label);
-        this._osdWindows[monitorIndex].setMaxLevel(1);
         this._osdWindows[monitorIndex].setLevel(level);
         this._osdWindows[monitorIndex].show();
-    }
+    },
 
-    show(monitorIndex, icon, label, level, convertIndex) {
+    show: function(monitorIndex, icon, level, convertIndex) {
         if (this._osdWindows.length === 0)
             return;
 
-        if (monitorIndex !== -1) {
+        if (monitorIndex != -1) {
             if (convertIndex)
                 monitorIndex = convertGdkIndex(monitorIndex);
             for (let i = 0; i < this._osdWindows.length; i++) {
-                if (i === monitorIndex)
-                    this._showOsdWindow(i, icon, label, level);
+                if (i == monitorIndex)
+                    this._showOsdWindow(i, icon, level);
                 else
                     this._osdWindows[i].cancel();
             }
         } else {
             for (let i = 0; i < this._osdWindows.length; i++)
-                this._showOsdWindow(i, icon, label, level);
+                this._showOsdWindow(i, icon, level);
         }
-    }
+    },
 
-    hideAll() {
+    hideAll: function() {
         if (this._osdWindows.length === 0)
             return;
 

@@ -88,10 +88,8 @@ const GObject = imports.gi.GObject;
 const XApp = imports.gi.XApp;
 const PointerTracker = imports.misc.pointerTracker;
 
-const AudioDeviceSelection = imports.ui.audioDeviceSelection;
 const SoundManager = imports.ui.soundManager;
 const BackgroundManager = imports.ui.backgroundManager;
-const Config = imports.misc.config;
 const SlideshowManager = imports.ui.slideshowManager;
 var AppletManager = imports.ui.appletManager;
 const SearchProviderManager = imports.ui.searchProviderManager;
@@ -105,11 +103,9 @@ const Expo = imports.ui.expo;
 const Panel = imports.ui.panel;
 const PlacesManager = imports.ui.placesManager;
 const PolkitAuthenticationAgent = imports.ui.polkitAuthenticationAgent;
-const KeyringPrompt = imports.ui.keyringPrompt;
 const RunDialog = imports.ui.runDialog;
 const Layout = imports.ui.layout;
 const LookingGlass = imports.ui.lookingGlass;
-const NetworkAgent = imports.ui.networkAgent;
 const NotificationDaemon = imports.ui.notificationDaemon;
 const WindowAttentionHandler = imports.ui.windowAttentionHandler;
 const CinnamonDBus = imports.ui.cinnamonDBus;
@@ -130,7 +126,6 @@ const ScreenRecorder = imports.ui.screenRecorder;
 const {GesturesManager} = imports.ui.gestures.gesturesManager;
 const {MonitorLabeler} = imports.ui.monitorLabeler;
 const {CinnamonPortalHandler} = imports.misc.portalHandlers;
-const {EndSessionDialog} = imports.ui.endSessionDialog;;
 
 var LAYOUT_TRADITIONAL = "traditional";
 var LAYOUT_FLIPPED = "flipped";
@@ -156,7 +151,6 @@ var messageTray = null;
 var notificationDaemon = null;
 var windowAttentionHandler = null;
 var screenRecorder = null;
-var cinnamonAudioSelectionDBusService = null;
 var cinnamonDBusService = null;
 var screenshotService = null;
 var modalCount = 0;
@@ -168,7 +162,6 @@ var xdndHandler = null;
 var statusIconDispatcher = null;
 var virtualKeyboard = null;
 var layoutManager = null;
-var networkAgent = null;
 var monitorLabeler = null;
 var themeManager = null;
 var keybindingManager = null;
@@ -194,8 +187,6 @@ var animations_enabled = false;
 var popup_rendering_actor = null;
 
 var xlet_startup_error = false;
-
-var endSessionDialog = null;
 
 var gpuOffloadHelper = null;
 var gpu_offload_supported = false;
@@ -285,7 +276,7 @@ function start() {
 
     let cinnamonStartTime = new Date().getTime();
 
-    log(`About to start Cinnamon (${Meta.is_wayland_compositor() ? "Wayland" : "XLibre"} backend)`);
+    log(`About to start Cinnamon (${Meta.is_wayland_compositor() ? "Wayland" : "AcreetionOS-XLibre"} backend)`);
 
     let backend = Meta.get_backend();
 
@@ -317,7 +308,6 @@ function start() {
     Clutter.get_default_backend().set_input_method(new InputMethod.InputMethod());
 
     new CinnamonPortalHandler();
-    cinnamonAudioSelectionDBusService = new AudioDeviceSelection.AudioDeviceSelectionDBus();
     cinnamonDBusService = new CinnamonDBus.CinnamonDBus();
     setRunState(RunState.STARTUP);
 
@@ -380,7 +370,7 @@ function start() {
 
     global.reparentActor(global.top_window_group, global.stage);
 
-    global.menuStack = [];
+    global.menuStackLength = 0;
 
     layoutManager = new Layout.LayoutManager();
 
@@ -428,9 +418,6 @@ function start() {
     windowAttentionHandler = new WindowAttentionHandler.WindowAttentionHandler();
     placesManager = new PlacesManager.PlacesManager();
 
-    if (Config.HAVE_NETWORKMANAGER)
-        networkAgent = new NetworkAgent.NetworkAgent();
-
     magnifier = new Magnifier.Magnifier();
     locatePointer = new LocatePointer.locatePointer();
 
@@ -443,9 +430,9 @@ function start() {
     _initUserSession();
     screenRecorder = new ScreenRecorder.ScreenRecorder();
 
-    PolkitAuthenticationAgent.init();
-
-    KeyringPrompt.init();
+    if (Meta.is_wayland_compositor()) {
+        PolkitAuthenticationAgent.init();
+    }
 
     _startDate = new Date();
 
@@ -1579,23 +1566,4 @@ function restartCinnamon(showOsd = false) {
     });
 
     global.reexec_self();
-}
-
-function showEndSessionDialog(mode) {
-    if (endSessionDialog != null) {
-        global.logWarning("End session dialog already exists");
-        return;
-    }
-
-    endSessionDialog = new EndSessionDialog(mode);
-    endSessionDialog.open();
-}
-
-function closeEndSessionDialog() {
-    if (endSessionDialog == null) {
-        return;
-    }
-
-    endSessionDialog.close();
-    endSessionDialog = null;
 }

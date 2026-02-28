@@ -30,8 +30,18 @@
         "scroll-behavior",
         "left-click-action",
         "middle-click-action",
-        "show-all-workspaces",
-        "window-display-settings"
+        "show-all-workspaces"
+      ]
+    },
+    "appButtonsSection": {
+      "type" : "section",
+      "title" : "Application Buttons",
+      "keys": [
+        "title-display",
+        "launcher-animation-effect",
+        "number-display",
+        "pinned-apps",
+        "enable-app-button-dragging"
       ]
     },
     "hotKeysSection": {
@@ -42,16 +52,6 @@
         "show-apps-order-hotkey",
         "show-apps-order-timeout",
         "super-num-hotkeys"
-      ]
-    },
-    "appButtonsSection": {
-      "type" : "section",
-      "title" : "Application Buttons",
-      "keys": [
-        "title-display",
-        "launcher-animation-effect",
-        "number-display",
-        "enable-app-button-dragging"
       ]
     },
     "thumbnailsSection": {
@@ -89,11 +89,21 @@
       ]
     }
   },
-
-  "group-apps": {
+  "number-display": {
     "type": "checkbox",
     "default": true,
-    "description": "Group windows by application"
+    "description": "Show window count numbers"
+  },
+  "title-display": {
+    "type": "combobox",
+    "default": 1,
+    "description": "Button label",
+    "options": {
+      "None": 1,
+      "Application name": 2,
+      "Window title": 3,
+      "Window title (only for the focused window)": 4
+    }
   },
   "scroll-behavior": {
     "type": "combobox",
@@ -125,18 +135,33 @@
       "Close last focused window in group": 3
     }
   },
+  "pinned-apps": {
+    "type": "generic",
+    "default": ["nemo.desktop", "firefox.desktop", "org.gnome.Terminal.desktop"]
+  },
+  "group-apps": {
+    "type": "checkbox",
+    "default": true,
+    "description": "Group windows by application"
+  },
   "show-all-workspaces": {
     "type": "checkbox",
     "default": false,
     "description": "Show windows from all workspaces"
   },
-  "window-display-settings": {
+  "enable-app-button-dragging": {
+    "type": "checkbox",
+    "default": true,
+    "description": "Enable app button dragging"
+  },
+  "launcher-animation-effect": {
     "type": "combobox",
-    "default": 1,
-    "description": "Show windows from other monitors",
+    "default": 3,
+    "description": "Launcher animation",
     "options": {
-      "Only from monitors without a window list": 1,
-      "From all monitors": 2
+      "None": 1,
+      "Fade": 2,
+      "Scale": 3
     }
   },
   "cycleMenusHotkey": {
@@ -163,36 +188,27 @@
     "default": true,
     "description": "Enable Super+<number> shortcut to switch/open apps"
   },
-  "title-display": {
+  "thumbnail-timeout": {
+    "dependency": "!onclick-thumbnails",
     "type": "combobox",
-    "default": 1,
-    "description": "Button label",
+    "default": 250,
+    "description": "Delay before showing thumbnails",
     "options": {
-      "None": 1,
-      "Application name": 2,
-      "Window title": 3,
-      "Window title (only for the focused window)": 4
+      "50 ms": 50,
+      "250 ms": 250,
+      "500 ms": 500
     }
   },
-  "launcher-animation-effect": {
+  "thumbnail-size": {
     "type": "combobox",
-    "default": 3,
-    "description": "Launcher animation",
+    "default": 6,
+    "description": "Thumbnail size",
     "options": {
-      "None": 1,
-      "Fade": 2,
-      "Scale": 3
+      "Small": 3,
+      "Medium": 6,
+      "Large": 9,
+      "Largest": 12
     }
-  },
-  "number-display": {
-    "type": "checkbox",
-    "default": true,
-    "description": "Show window count numbers"
-  },
-  "enable-app-button-dragging": {
-    "type": "checkbox",
-    "default": true,
-    "description": "Enable app button dragging"
   },
   "thumbnail-scroll-behavior": {
     "type": "checkbox",
@@ -229,27 +245,21 @@
     "default": false,
     "description": "Click to show thumbnails"
   },
-  "thumbnail-timeout": {
-    "dependency": "!onclick-thumbnails",
-    "type": "combobox",
-    "default": 250,
-    "description": "Delay before showing thumbnails",
-    "options": {
-      "50 ms": 50,
-      "250 ms": 250,
-      "500 ms": 500
-    }
+  "show-recent": {
+    "type": "checkbox",
+    "default": true,
+    "description": "Show recent items"
   },
-  "thumbnail-size": {
-    "type": "combobox",
-    "default": 6,
-    "description": "Thumbnail size",
-    "options": {
-      "Small": 3,
-      "Medium": 6,
-      "Large": 9,
-      "Largest": 12
-    }
+  "autostart-menu-item": {
+    "type": "checkbox",
+    "default": false,
+    "description": "Show autostart option"
+  },
+  "monitor-move-all-windows": {
+    "type": "checkbox",
+    "default": true,
+    "description": "Apply the monitor move option to all windows",
+    "tooltip": "When clicking \"Move to monitor\" in the context menu, this option will move all of an app's windows instead of just the last focused window from the app."
   },
   "enable-hover-peek": {
     "type": "checkbox",
@@ -288,26 +298,5 @@
     "step": 1,
     "units": "percent",
     "description": "Window opacity"
-  },
-  "show-recent": {
-    "type": "checkbox",
-    "default": true,
-    "description": "Show recent items"
-  },
-  "autostart-menu-item": {
-    "type": "checkbox",
-    "default": false,
-    "description": "Show autostart option"
-  },
-  "monitor-move-all-windows": {
-    "type": "checkbox",
-    "default": true,
-    "description": "Apply the monitor move option to all windows",
-    "tooltip": "When clicking \"Move to monitor\" in the context menu, this option will move all of an app's windows instead of just the last focused window from the app."
-  },
-
-  "pinned-apps": {
-    "type": "generic",
-    "default": ["nemo.desktop", "firefox.desktop", "org.gnome.Terminal.desktop"]
   }
 }

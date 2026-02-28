@@ -1,1 +1,1 @@
-sudo bash ./refresh.sh && sudo bash ./mkarchiso.sh && sudo bash rm -rf ./work
+sudo ./refresh.sh && sudo ./mkarchiso.sh && sudo rm -rf ./work
