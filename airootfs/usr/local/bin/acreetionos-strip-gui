@@ -87,20 +87,41 @@ pacman -Qdtq 2>/dev/null | pacman -Rns ${PACMAN_OPTS} - 2>/dev/null || true
 rm -f /etc/acreetionos-firstboot-done
 
 echo ""
-echo "✅ GUI stripped successfully. System will boot to TTY."
-echo "   Login with your credentials and manage the system from the command line."
-echo ""
-echo "   To reinstall the GUI later:"
-echo "     sudo acreetionos-install-gui"
+echo "╔══════════════════════════════════════════════════════════════╗"
+echo "║      ✅ GUI stripped successfully!                          ║"
+echo "║                                                              ║"
+echo "║  The desktop environment has been removed:                   ║"
+echo "║    • Cinnamon, Xorg, LightDM, PipeWire — all gone            ║"
+echo "║    • ~500MB disk space recovered                             ║"
+echo "║    • System will now boot to TTY (multi-user.target)         ║"
+echo "║                                                              ║"
+echo "║  ⚠  THE SYSTEM IS GOING TO REBOOT.                          ║"
+echo "║     Save any work before the countdown reaches zero.         ║"
+echo "║                                                              ║"
+echo "║  After reboot, log in at the terminal with your credentials. ║"
+echo "║                                                              ║"
+echo "║  To reinstall the GUI later:                                 ║"
+echo "║    sudo acreetionos-install-gui                              ║"
+echo "║                                                              ║"
+echo "╚══════════════════════════════════════════════════════════════╝"
 echo ""
 
-# 5. Reboot or inform
+# 5. Reboot with clear warning
 if [[ "${DIALOG}" == "gui" ]]; then
-    zenity --info --title="GUI Stripped" \
-        --text="Desktop environment removed.\nSystem will now reboot to TTY mode." \
-        --width=400 2>/dev/null || true
+    zenity --warning --title="⚠ SYSTEM WILL REBOOT" \
+        --text="<b>The desktop has been stripped.</b>\n\nThe system will reboot to TTY mode in 10 seconds.\n\nSave any work now." \
+        --width=450 2>/dev/null || true
 fi
 
-echo "Rebooting in 5 seconds..."
-sleep 5
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  ⚠  REBOOTING IN 10 SECONDS — SAVE ANY WORK NOW"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+for i in 10 9 8 7 6 5 4 3 2 1; do
+    echo -ne "  Rebooting in ${i} seconds...\r"
+    sleep 1
+done
+echo ""
+echo "  Rebooting now."
 reboot
