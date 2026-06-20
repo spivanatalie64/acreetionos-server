@@ -332,6 +332,9 @@ systemctl enable chronyd.service >/dev/null 2>&1
 systemctl enable docker.service >/dev/null 2>&1
 systemctl enable libvirtd.service >/dev/null 2>&1
 
+# Enable first-boot wizard (shows once, asks keep GUI or strip to TTY)
+systemctl enable acreetionos-firstboot.service >/dev/null 2>&1
+
 # Configure NetworkManager for hostname
 echo "[main]" > /etc/NetworkManager/conf.d/hostname.conf
 echo "hostname-mode=config" >> /etc/NetworkManager/conf.d/hostname.conf
@@ -346,6 +349,20 @@ echo "[CONFIG] Configuration complete."
 CHROOTEOF
 
 chmod +x "${INSTALL_DIR}/root/chroot_config.sh"
+
+# Deploy first-boot scripts and services from the live ISO to the target
+info "Deploying system scripts..."
+mkdir -p "${INSTALL_DIR}/usr/local/bin"
+mkdir -p "${INSTALL_DIR}/etc/systemd/system"
+mkdir -p "${INSTALL_DIR}/etc/xdg/autostart"
+cp /usr/local/bin/acreetionos-firstboot "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+cp /usr/local/bin/acreetionos-strip-gui "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+cp /usr/local/bin/acreetionos-install-gui "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+cp /usr/local/bin/acreetionos-maintain "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+cp /etc/systemd/system/acreetionos-firstboot.service "${INSTALL_DIR}/etc/systemd/system/" 2>/dev/null || true
+cp /etc/xdg/autostart/acreetionos-firstboot.desktop "${INSTALL_DIR}/etc/xdg/autostart/" 2>/dev/null || true
+chmod 755 "${INSTALL_DIR}/usr/local/bin/acreetionos-"* 2>/dev/null || true
+log "System scripts deployed."
 
 # Execute configuration in chroot — pass passwords as arguments
 arch-chroot "${INSTALL_DIR}" /root/chroot_config.sh "${ROOT_PASSWORD}" "${USER_PASSWORD}" 2>&1 | grep -v "^$" || true

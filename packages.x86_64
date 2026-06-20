@@ -1,7 +1,8 @@
 ################################################################################
-# AcreetionOS Server Package List v2.0 — Desktop Experience Edition
-# Auto-installing headless server with Cinnamon desktop for management
-# Like Windows Server with Desktop Experience — minimal GUI, maximum server
+# AcreetionOS Server Package List v3.0 — Full Desktop Experience
+# Auto-installing server ISO with complete Cinnamon desktop.
+# First-boot popup asks: keep GUI or strip to TTY?
+# Includes full maintenance tooling. Arch-based, just better.
 ################################################################################
 
 ################################################################################
@@ -20,15 +21,19 @@ mkinitcpio-openswap
 sudo
 dbus
 polkit
+polkit-gnome
 arch-install-scripts
 reflector
+pacman-contrib
 
 ################################################################################
 # BOOT & BOOTLOADER
 ################################################################################
 grub
+syslinux
 efibootmgr
 os-prober
+plymouth
 
 ################################################################################
 # FILESYSTEM SUPPORT
@@ -40,6 +45,7 @@ ntfs-3g
 squashfs-tools
 gptfdisk
 parted
+gpart
 btrfs-progs
 xfsprogs
 device-mapper
@@ -64,14 +70,28 @@ openssh
 rsync
 
 ################################################################################
-# DISPLAY SERVER — Desktop Experience
+# AUDIO — full desktop audio stack
+################################################################################
+alsa-utils
+pipewire-pulse
+wireplumber
+pavucontrol
+sof-firmware
+
+################################################################################
+# DISPLAY SERVER — full graphics stack
 ################################################################################
 xorg-server
+xorg-server-common
 xorg-xinit
 xorg-xrandr
 xorg-xrdb
 mesa
+mesa-utils
 glu
+vulkan-headers
+ocl-icd
+opencl-headers
 xf86-input-libinput
 xf86-video-amdgpu
 xf86-video-intel
@@ -85,7 +105,7 @@ lightdm-gtk-greeter
 accountsservice
 
 ################################################################################
-# CINNAMON DESKTOP — Minimal Desktop Experience
+# CINNAMON DESKTOP — full desktop experience
 ################################################################################
 cinnamon
 cinnamon-control-center
@@ -107,14 +127,29 @@ gnome-themes-extra
 ################################################################################
 xdg-desktop-portal-xapp
 xdg-user-dirs
+xdg-user-dirs-gtk
 xdg-utils
 
 ################################################################################
-# AUDIO — Minimal for desktop feedback
+# DESKTOP APPLICATIONS — utilities, not bloat
 ################################################################################
-pipewire-pulse
-wireplumber
-alsa-utils
+xed
+gnome-system-monitor
+webapp-manager
+fastfetch
+pamac-gtk3
+
+################################################################################
+# THEMES & ICONS — same look as desktop version
+################################################################################
+adwaita-icon-theme
+mate-icon-theme-faenza
+gnu-free-fonts
+
+################################################################################
+# NETWORK SHARING
+################################################################################
+samba
 
 ################################################################################
 # SYSTEM UTILITIES
@@ -124,12 +159,15 @@ nano-syntax-highlighting
 less
 zsh
 vim
-fastfetch
 htop
 iotop
 nvtop
+btop
 screen
 tmux
+ncdu
+diffutils
+fakeroot
 
 ################################################################################
 # HARDWARE SUPPORT
@@ -138,6 +176,8 @@ usbutils
 nvme-cli
 smartmontools
 lm_sensors
+dmidecode
+hdparm
 
 ################################################################################
 # DEVELOPMENT TOOLS
@@ -218,6 +258,8 @@ cloud-guest-utils
 qemu-desktop
 libvirt
 edk2-ovmf
+open-vm-tools
+qemu-guest-agent
 
 ################################################################################
 # BACKUP & SYNC
@@ -232,12 +274,22 @@ aria2
 # TIME SYNC
 ################################################################################
 chrony
-systemd-resolvconf
+
+################################################################################
+# MAINTENANCE & RECOVERY TOOLS — Arch-based, just better
+################################################################################
+arch-install-scripts
+pkgfile
+arch-audit
+testdisk
+partclone
+ddrescue
+fsarchiver
+timeshift
 
 ################################################################################
 # MISCELLANEOUS
 ################################################################################
 pv
-pacman-contrib
 mailcap
 mtools

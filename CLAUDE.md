@@ -1,76 +1,68 @@
-# CLAUDE.md
+# CLAUDE.md — AcreetionOS Server
 
-This file provides guidance to Claude Code when working with code in this repository.
+## Overview
 
-## Project Overview
+AcreetionOS Server is an auto-installing Arch Linux-based server ISO with a full
+Cinnamon desktop experience. On first boot, it asks whether you want to keep the
+GUI or strip to TTY-only mode — like Windows Server with Desktop Experience,
+but with a choice.
 
-AcreetionOS Server is a server variant of AcreetionOS — an Arch Linux-based distribution that creates a bootable ISO using the archiso framework. Unlike the desktop variant, this ISO **auto-installs itself** to disk on boot. After installation, the user is presented with a **Cinnamon desktop environment** pre-loaded with server-oriented tooling — similar to Windows Server with Desktop Experience.
+## Key Concepts
 
-Think of it as: boot → wait 10 minutes → reboot → server desktop ready.
+### Auto-Installation
+The ISO boots, auto-partitions the first available disk, installs everything,
+and reboots. Zero interaction required.
 
-## Key Concept: Auto-Installation
+### First-Boot Wizard
+On first boot after installation, a wizard (`acreetionos-firstboot`) runs and asks:
+- **Keep GUI**: Full Cinnamon desktop + server tools
+- **Strip to TTY**: Removes ~500MB of desktop packages, switches to multi-user.target
 
-When the ISO boots:
-1. The live environment starts with root autologin on tty1
-2. A systemd service (`acreetionos-server-installer.service`) triggers automatically
-3. The installer (`/usr/local/bin/acreetionos-server-installer`) runs:
-   - Detects the first available non-ISO disk
-   - Creates GPT partition layout (1GB EFI + rest as ext4)
-   - Installs base system via pacstrap
-   - Configures locale, hostname, users, bootloader, services
-   - Installs all packages (Cinnamon desktop + server tools)
-   - Enables lightdm and graphical.target
-   - Reboots
+This is reversible:
+- `sudo acreetionos-strip-gui` — remove GUI anytime
+- `sudo acreetionos-install-gui` — reinstall GUI anytime
 
-After reboot, credentials are displayed on screen and saved to `/root/.credentials.txt`
-on the installed system. They are randomly generated at install time — nothing is
-hardcoded in the repository. Change them immediately after first login.
+### Maintenance Tool
+`sudo acreetionos-maintain` — one-stop shop for:
+- System updates, cache cleaning, orphan removal
+- Log inspection, SMART health, disk usage (ncdu)
+- Firewall config (nftables), auto-update timers
+- Docker management, SSL cert checks, DB status
+- Network diagnostics, installed package overview
+
+### Default Credentials
+Passwords are generated at install time (32-char random). Displayed on screen
+and saved to `/root/.credentials.txt` on the installed system. **Nothing is
+hardcoded in the repository.**
 
 ## Build Commands
 
-### Primary Build Process
-- **Full build**: `./build.sh` — Cleans workspace and builds ISO
-- **Manual build**: `./mkarchiso.sh` — Runs mkarchiso directly
-- **Clean workspace**: `./refresh.sh` — Removes work/ and out/ directories
-
-### Build Process Details
-1. `refresh.sh` removes previous build artifacts (work/, out/)
-2. `mkarchiso.sh` calls the archiso build system with AcreetionOS-Server label
-3. Final ISO is output to `../ISO/` directory
-4. Build uses custom `pacman.conf` for package management
+- **Full build**: `./build.sh` — cleans and builds ISO
+- **Manual build**: `./mkarchiso.sh` — runs mkarchiso directly
+- **Clean workspace**: `./refresh.sh` — removes work/ and out/
 
 ## Architecture
 
-### Key Configuration Files
-- **profiledef.sh**: ISO metadata, boot modes, file permissions
-- **packages.x86_64**: Package list — Cinnamon desktop + server tooling
-- **pacman.conf**: Custom Pacman configuration
-- **bootstrap_packages.x86_64**: Bootstrap packages for initial system
+### Live ISO Components (airootfs/)
+- `usr/local/bin/acreetionos-server-installer` — auto-install script
+- `usr/local/bin/acreetionos-server-display` — tty1 status display
+- `etc/systemd/system/acreetionos-server-installer.service` — triggers installer
+- `etc/systemd/system/getty@tty1.service.d/autologin.conf` — root autologin
 
-### Auto-Installer Components
-- **airootfs/usr/local/bin/acreetionos-server-installer**: Main install script (partition, pacstrap, configure, reboot)
-- **airootfs/usr/local/bin/acreetionos-server-display**: tty1 display script (shows progress during install)
-- **airootfs/etc/systemd/system/acreetionos-server-installer.service**: Systemd service that triggers installer on boot
-- **airootfs/root/.automated_script.sh**: Archiso script mechanism (can also trigger installer via kernel param)
+### Installed System Components (deployed by installer)
+- `usr/local/bin/acreetionos-firstboot` — first-boot wizard (zenity/whiptail)
+- `usr/local/bin/acreetionos-strip-gui` — removes desktop, drops to TTY
+- `usr/local/bin/acreetionos-install-gui` — reinstalls desktop
+- `usr/local/bin/acreetionos-maintain` — interactive maintenance tool
+- `etc/systemd/system/acreetionos-firstboot.service` — triggers wizard on boot
+- `etc/xdg/autostart/acreetionos-firstboot.desktop` — GUI autostart entry
 
-### What's Included
-- **Desktop**: Cinnamon (core components), LightDM, Xorg, PipeWire
-- **Web**: nginx-mainline, apache, certbot
-- **Databases**: mariadb, postgresql, redis, sqlite
-- **Containers**: docker, docker-compose, containerd, buildkit
-- **Monitoring**: prometheus, grafana, node_exporter, netdata
-- **Networking**: bind, dnsmasq, wireguard-tools, nftables
-- **Cloud**: cloud-init, cloud-guest-utils
-- **Virtualization**: qemu, libvirt, edk2-ovmf
-- **Backup**: restic, borg
+### Package Profile
+- **Desktop**: Full Cinnamon with all applets, themes, icons, fonts
+- **Display**: Xorg + Mesa + Vulkan + AMD/Intel/Nvidia drivers
+- **Audio**: PipeWire + PulseAudio + ALSA
+- **Services**: NetworkManager, OpenSSH, Docker, libvirt, chrony
+- **Servers**: nginx, apache, mariadb, postgresql, redis, prometheus, grafana
 - **Dev**: base-devel, git, go, rust, nodejs, python
-
-## Development Notes
-
-- Build process requires sudo privileges for archiso operations
-- ISO builds are resource-intensive and create large work directories
-- Package list can be modified by editing packages.x86_64
-- The auto-installer is in `/usr/local/bin/acreetionos-server-installer` in airootfs
-- **No hardcoded credentials** — passwords generated at install time
-- Forked from AcreetionOS desktop — see parent for desktop variant
-- Mirrored across GitHub, GitLab, and Codeberg
+- **Maintenance**: btop, ncdu, htop, tmux, screen, nftables, pkgfile, arch-audit
+- **Backup**: restic, borg, timeshift, testdisk, ddrescue, fsarchiver
