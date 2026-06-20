@@ -553,8 +553,13 @@ cp /usr/local/bin/acreetionos-welcome "${INSTALL_DIR}/usr/local/bin/" 2>/dev/nul
 cp /usr/local/bin/acreetionos-toolbox "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
 cp /usr/local/bin/acreetionos-systemd "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
 cp /usr/local/bin/acreetionos-wizard* "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+cp /usr/local/bin/acreetionos-profile "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
 mkdir -p "${INSTALL_DIR}/usr/share/applications"
+mkdir -p "${INSTALL_DIR}/usr/local/share/acreetionos/providers"
+mkdir -p "${INSTALL_DIR}/usr/local/share/acreetionos/industries"
 cp /usr/share/applications/acreetionos-*.desktop "${INSTALL_DIR}/usr/share/applications/" 2>/dev/null || true
+cp -r /usr/local/share/acreetionos/providers/* "${INSTALL_DIR}/usr/local/share/acreetionos/providers/" 2>/dev/null || true
+cp -r /usr/local/share/acreetionos/industries/* "${INSTALL_DIR}/usr/local/share/acreetionos/industries/" 2>/dev/null || true
 cp /etc/systemd/system/acreetionos-firstboot.service "${INSTALL_DIR}/etc/systemd/system/" 2>/dev/null || true
 cp /etc/xdg/autostart/acreetionos-firstboot.desktop "${INSTALL_DIR}/etc/xdg/autostart/" 2>/dev/null || true
 cp /etc/xdg/autostart/acreetionos-welcome.desktop "${INSTALL_DIR}/etc/xdg/autostart/" 2>/dev/null || true

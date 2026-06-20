@@ -23,6 +23,7 @@ TOOLS=(
     "Systemd|acreetionos-systemd|Complete systemd admin (services, timers, journals, boot, targets, sockets, more)|sudo acreetionos-systemd"
     
     # ── SETUP WIZARDS ──
+    "Wizards|acreetionos-profile|Select provider + industry → cloud-init config|sudo acreetionos-profile"
     "Wizards|acreetionos-wizard|Master setup hub — all wizards in one place|sudo acreetionos-wizard"
     "Wizards|Setup Wizard|Full system setup — hostname, locale, timezone, users|sudo acreetionos-wizard-setup"
     "Wizards|Firewall|Configure ports, presets, custom rules|sudo acreetionos-wizard-firewall"

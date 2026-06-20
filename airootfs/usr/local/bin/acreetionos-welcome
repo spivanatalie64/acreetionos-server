@@ -85,6 +85,7 @@ Or SSH directly:    ssh <user>@<ip>
 
 🛠️  BUILT-IN TOOLS
 
+  acreetionos-profile     — Deployment profiles for 100+ VPS providers
   acreetionos-wizard      — Master setup hub for everything
   acreetionos-systemd     — Complete systemd admin (services, timers,
                            journals, boot analysis, and more)
