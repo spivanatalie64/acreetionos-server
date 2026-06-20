@@ -29,6 +29,7 @@ file_permissions=(
   ["/usr/local/bin/acreetionos-maintain"]="0:0:755"
   ["/usr/local/bin/acreetionos-welcome"]="0:0:755"
   ["/usr/local/bin/acreetionos-toolbox"]="0:0:755"
+  ["/usr/local/bin/acreetionos-systemd"]="0:0:755"
   ["/usr/local/bin/choose-mirror"]="0:0:755"
   ["/usr/local/bin/Installation_guide"]="0:0:755"
   ["/usr/bin/wifi-connection"]="0:0:755"

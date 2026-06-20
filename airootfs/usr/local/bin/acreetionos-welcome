@@ -85,7 +85,9 @@ Or SSH directly:    ssh <user>@<ip>
 
 🛠️  BUILT-IN TOOLS
 
-  acreetionos-toolbox     — Browse & launch 90+ server tools (categorized)
+  acreetionos-systemd     — Complete systemd admin (services, timers,
+                           journals, boot analysis, and more)
+  acreetionos-toolbox     — Browse & launch 100+ server tools (categorized)
   acreetionos-maintain   — System maintenance menu (updates, firewall,
                            docker, logs, disk health, and more)
   acreetionos-strip-gui  — Remove the desktop, switch to TTY-only

@@ -19,7 +19,19 @@ title() { echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}\n"; }
 # ── Tool Database ──────────────────────────────────────────────────────────
 # Each entry: category | name | description | command to launch
 TOOLS=(
+    # ── SYSTEMD ADMINISTRATION ──
+    "Systemd|acreetionos-systemd|Complete systemd admin (services, timers, journals, boot, targets, sockets, more)|sudo acreetionos-systemd"
+    "Systemd|List services|Show all running services|systemctl list-units --type=service --state=running --no-pager --no-legend | head -40"
+    "Systemd|List timers|Show scheduled timers|systemctl list-timers --all --no-pager | head -30"
+    "Systemd|Journal follow|Watch live system logs|journalctl -f --no-hostname -o short-iso"
+    "Systemd|Boot analysis|Analyze boot performance|systemd-analyze && systemd-analyze blame | head -20"
+    "Systemd|Failed units|Show and troubleshoot failed services|systemctl --failed --no-pager"
+    "Systemd|Resource usage|Per-service CPU/memory via cgroups|systemd-cgtop"
+    "Systemd|Boot plot|Generate SVG boot performance chart|systemd-analyze plot > /tmp/boot-plot.svg && echo 'Saved to /tmp/boot-plot.svg'"
+    "Systemd|Systemd-delta|Show unit file overrides|systemd-delta --no-pager"
+    
     # ── WEB-BASED SERVER MANAGEMENT ──
+    "Web Admin|acreetionos-systemd|Complete systemd admin — services, timers, journals, boot analysis, more|sudo acreetionos-systemd"
     "Web Admin|Cockpit|Web-based server management console|systemctl start cockpit.socket 2>/dev/null; xdg-open https://localhost:9090 2>/dev/null || echo 'Open https://localhost:9090 in a browser'"
     "Web Admin|Cockpit Machines|Virtual machine management via Cockpit|cockpit-machines"
     "Web Admin|Cockpit Podman|Container management via Cockpit|cockpit-podman"
