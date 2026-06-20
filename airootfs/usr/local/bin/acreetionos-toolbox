@@ -21,6 +21,18 @@ title() { echo -e "\n${CYAN}${BOLD}━━━ $1 ━━━${NC}\n"; }
 TOOLS=(
     # ── SYSTEMD ADMINISTRATION ──
     "Systemd|acreetionos-systemd|Complete systemd admin (services, timers, journals, boot, targets, sockets, more)|sudo acreetionos-systemd"
+    
+    # ── SETUP WIZARDS ──
+    "Wizards|acreetionos-wizard|Master setup hub — all wizards in one place|sudo acreetionos-wizard"
+    "Wizards|Setup Wizard|Full system setup — hostname, locale, timezone, users|sudo acreetionos-wizard-setup"
+    "Wizards|Firewall|Configure ports, presets, custom rules|sudo acreetionos-wizard-firewall"
+    "Wizards|Databases|Initialize MariaDB/PostgreSQL, create databases|sudo acreetionos-wizard-database"
+    "Wizards|Security|SSH keys, fail2ban, audit, rootkits, AV|sudo acreetionos-wizard-security"
+    "Wizards|Backup|Configure restic/borg/timeshift, enable schedule|sudo acreetionos-wizard-backup"
+    "Wizards|Monitoring|Prometheus, Grafana, Netdata setup|sudo acreetionos-wizard-monitoring"
+    "Wizards|Docker Stacks|Deploy LEMP, WordPress, Nextcloud, more|sudo acreetionos-wizard-stacks"
+    "Wizards|Network|Static IP, bridges, VLANs, DNS|sudo acreetionos-wizard-network"
+    "Wizards|Virtual Machine|Create and manage VMs|sudo acreetionos-wizard-vm"
     "Systemd|List services|Show all running services|systemctl list-units --type=service --state=running --no-pager --no-legend | head -40"
     "Systemd|List timers|Show scheduled timers|systemctl list-timers --all --no-pager | head -30"
     "Systemd|Journal follow|Watch live system logs|journalctl -f --no-hostname -o short-iso"

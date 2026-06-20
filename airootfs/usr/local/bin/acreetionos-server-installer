@@ -394,7 +394,7 @@ sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="quiet"
 echo 'GRUB_DISABLE_SUBMENU=y' >> /etc/default/grub
 grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1
 
-# Enable essential services
+# ── Service Enablement ─────────────────────────────────────────────
 systemctl enable NetworkManager.service >/dev/null 2>&1
 systemctl enable sshd.service >/dev/null 2>&1
 systemctl enable systemd-resolved.service >/dev/null 2>&1
@@ -405,12 +405,132 @@ systemctl enable libvirtd.service >/dev/null 2>&1
 # Enable first-boot wizard (shows once, asks keep GUI or strip to TTY)
 systemctl enable acreetionos-firstboot.service >/dev/null 2>&1
 
-# Configure NetworkManager for hostname
+# ── Network ────────────────────────────────────────────────────────
 echo "[main]" > /etc/NetworkManager/conf.d/hostname.conf
 echo "hostname-mode=config" >> /etc/NetworkManager/conf.d/hostname.conf
-
-# Setup resolved symlink
 ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+
+# ── Firewall: Default SSH-only ─────────────────────────────────────
+# Ships locked down. Open what you need with acreetionos-wizard-firewall.
+mkdir -p /etc/nftables
+cat > /etc/nftables/acreetionos-server.conf << 'NFTEOF'
+#!/usr/sbin/nft -f
+table inet acreetionos {
+    chain input {
+        type filter hook input priority 0; policy drop;
+        ct state { established, related } accept
+        iif lo accept
+        icmp type { echo-request } accept
+        tcp dport 22 accept
+    }
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+    }
+    chain output {
+        type filter hook output priority 0; policy accept;
+    }
+}
+NFTEOF
+chmod 600 /etc/nftables/acreetionos-server.conf
+# Apply rules and enable nftables
+nft -f /etc/nftables/acreetionos-server.conf 2>/dev/null || true
+systemctl enable nftables.service >/dev/null 2>&1 || true
+
+# ── SSH Hardening ──────────────────────────────────────────────────
+sed -i 's/^#PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^#PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+sed -i 's/^#MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config
+echo "AllowUsers admin ops" >> /etc/ssh/sshd_config
+# Also add port 8463 (alternative) for redundancy — comment out by default
+echo '# Port 8463' >> /etc/ssh/sshd_config
+echo '[SSH] Hardened — root login disabled, password auth disabled.'
+
+# ── Database Initialization ────────────────────────────────────────
+# MariaDB
+if command -v mysql_install_db &>/dev/null && [ ! -d /var/lib/mysql/mysql ]; then
+    mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql 2>/dev/null || true
+    systemctl enable mariadb.service >/dev/null 2>&1 || true
+    echo '[MariaDB] Initialized and enabled.'
+fi
+if command -v initdb &>/dev/null && [ ! -f /var/lib/postgres/data/PG_VERSION ]; then
+    mkdir -p /var/lib/postgres/data
+    chown postgres:postgres /var/lib/postgres/data
+    su - postgres -c "initdb -D /var/lib/postgres/data" 2>/dev/null || true
+    systemctl enable postgresql.service >/dev/null 2>&1 || true
+    echo '[PostgreSQL] Initialized and enabled.'
+fi
+
+# ── Prometheus / Grafana Basic Config ──────────────────────────────
+# Start with prometheus pointing at itself + node_exporter
+mkdir -p /etc/prometheus
+cat > /etc/prometheus/prometheus.yml << 'PROMEOF'
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: node
+    static_configs:
+      - targets: ['localhost:9090', 'localhost:9100']
+PROMEOF
+systemctl enable prometheus.service >/dev/null 2>&1 || true
+systemctl enable node_exporter.service >/dev/null 2>&1 || true
+systemctl enable grafana.service >/dev/null 2>&1 || true
+echo '[Monitoring] Prometheus + Grafana configured and enabled.'
+
+# ── Backup Timer Skeleton (disabled, user enables via wizard) ──────
+cat > /etc/systemd/system/acreetionos-daily-backup.service << 'BACEOF'
+[Unit]
+Description=AcreetionOS Server — Daily Backup
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/acreetionos-wizard-backup --run
+Nice=19
+IOSchedulingClass=idle
+BACEOF
+cat > /etc/systemd/system/acreetionos-daily-backup.timer << 'BACTIMER'
+[Unit]
+Description=AcreetionOS Server — Daily Backup Timer
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=6h
+
+[Install]
+WantedBy=timers.target
+BACTIMER
+echo '[Backup] Backup timer skeleton created. Enable with: acreetionos-wizard-backup'
+
+# ── SSL Auto-Renewal Timer ─────────────────────────────────────────
+cat > /etc/systemd/system/acreetionos-certbot-renew.service << 'CERTEOF'
+[Unit]
+Description=AcreetionOS Server — Certbot auto-renew
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/certbot renew --quiet --agree-tos
+ExecStartPost=/usr/bin/systemctl reload nginx.service 2>/dev/null || true
+ExecStartPost=/usr/bin/systemctl reload apache.service 2>/dev/null || true
+CERTEOF
+cat > /etc/systemd/system/acreetionos-certbot-renew.timer << 'CERTTIMER'
+[Unit]
+Description=Weekly Certbot renewal
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+RandomizedDelaySec=12h
+
+[Install]
+WantedBy=timers.target
+CERTTIMER
+systemctl daemon-reload
+systemctl enable acreetionos-certbot-renew.timer >/dev/null 2>&1
+echo '[SSL] Certbot auto-renewal timer enabled (weekly).'
 
 # Create server post-install marker
 touch /etc/acreetionos-server-installed
@@ -432,6 +552,9 @@ cp /usr/local/bin/acreetionos-maintain "${INSTALL_DIR}/usr/local/bin/" 2>/dev/nu
 cp /usr/local/bin/acreetionos-welcome "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
 cp /usr/local/bin/acreetionos-toolbox "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
 cp /usr/local/bin/acreetionos-systemd "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+cp /usr/local/bin/acreetionos-wizard* "${INSTALL_DIR}/usr/local/bin/" 2>/dev/null || true
+mkdir -p "${INSTALL_DIR}/usr/share/applications"
+cp /usr/share/applications/acreetionos-*.desktop "${INSTALL_DIR}/usr/share/applications/" 2>/dev/null || true
 cp /etc/systemd/system/acreetionos-firstboot.service "${INSTALL_DIR}/etc/systemd/system/" 2>/dev/null || true
 cp /etc/xdg/autostart/acreetionos-firstboot.desktop "${INSTALL_DIR}/etc/xdg/autostart/" 2>/dev/null || true
 cp /etc/xdg/autostart/acreetionos-welcome.desktop "${INSTALL_DIR}/etc/xdg/autostart/" 2>/dev/null || true
@@ -548,8 +671,10 @@ echo -e "${GREEN}║  │  Use the right user for the right job —           �
 echo -e "${GREEN}║  │  no sudo required for most operations.           │        ║${NC}"
 echo -e "${GREEN}║  └──────────────────────────────────────────────────┘        ║${NC}"
 echo -e "${GREEN}║                                                              ║${NC}"
-echo -e "${GREEN}║  Tools:  acreetionos-toolbox   — launch anything             ║${NC}"
-echo -e "${GREEN}║          acreetionos-maintain  — system maintenance          ║${NC}"
+echo -e "${GREEN}║  Tools:  acreetionos-wizard     — setup wizards (menu)        ║${NC}"
+echo -e "${GREEN}║          acreetionos-systemd    — systemd admin              ║${NC}"
+echo -e "${GREEN}║          acreetionos-toolbox    — launch 100+ tools          ║${NC}"
+echo -e "${GREEN}║          acreetionos-maintain   — system maintenance         ║${NC}"
 echo -e "${GREEN}║                                                              ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""

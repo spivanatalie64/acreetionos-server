@@ -85,6 +85,7 @@ Or SSH directly:    ssh <user>@<ip>
 
 🛠️  BUILT-IN TOOLS
 
+  acreetionos-wizard      — Master setup hub for everything
   acreetionos-systemd     — Complete systemd admin (services, timers,
                            journals, boot analysis, and more)
   acreetionos-toolbox     — Browse & launch 100+ server tools (categorized)
@@ -92,6 +93,8 @@ Or SSH directly:    ssh <user>@<ip>
                            docker, logs, disk health, and more)
   acreetionos-strip-gui  — Remove the desktop, switch to TTY-only
   acreetionos-install-gui — Reinstall the desktop
+
+  Or launch wizards from the Application menu → System → AcreetionOS.
 
 Most tools work without sudo if you're logged in as the right user:
 
