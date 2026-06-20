@@ -22,7 +22,9 @@ When the ISO boots:
    - Enables lightdm and graphical.target
    - Reboots
 
-After reboot, login with: `admin` / `acreetion` (or `root` / `acreetion`)
+After reboot, credentials are displayed on screen and saved to `/root/.credentials.txt`
+on the installed system. They are randomly generated at install time — nothing is
+hardcoded in the repository. Change them immediately after first login.
 
 ## Build Commands
 
@@ -69,6 +71,6 @@ After reboot, login with: `admin` / `acreetion` (or `root` / `acreetion`)
 - ISO builds are resource-intensive and create large work directories
 - Package list can be modified by editing packages.x86_64
 - The auto-installer is in `/usr/local/bin/acreetionos-server-installer` in airootfs
-- Default credentials: `admin`/`acreetion` — **change on first login**
+- **No hardcoded credentials** — passwords generated at install time
 - Forked from AcreetionOS desktop — see parent for desktop variant
 - Mirrored across GitHub, GitLab, and Codeberg

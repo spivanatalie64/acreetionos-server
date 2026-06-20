@@ -25,12 +25,18 @@ HOSTNAME="acreetion-server"
 TIMEZONE="UTC"
 LOCALE="en_US.UTF-8"
 KEYMAP="us"
-ROOT_PASSWORD="acreetion"
+# --- Passwords generated at install time (nothing hardcoded) ---
+ROOT_PASSWORD=""
 USER_NAME="admin"
-USER_PASSWORD="acreetion"
+USER_PASSWORD=""
 INSTALL_DIR="/mnt/install"
 EFI_SIZE="1024"  # MB for EFI partition
-PKGS_TO_INSTALL=""  # will be populated below
+
+# --- Generate cryptographically secure passwords ---
+gen_password() {
+    # 32-char random alphanumeric + special chars
+    openssl rand -base64 24 | tr -d '\n' | head -c 32
+}
 
 # --- Cleanup handler ---
 cleanup() {
@@ -116,6 +122,15 @@ for i in 10 9 8 7 6 5 4 3 2 1; do
 done
 echo ""
 log "Proceeding with installation..."
+
+# Generate passwords at runtime — nothing hardcoded, nothing in repo
+ROOT_PASSWORD=$(gen_password)
+USER_PASSWORD=$(gen_password)
+# Also stash a copy for display after install
+echo "${ROOT_PASSWORD}" > /tmp/root-pw
+echo "${USER_PASSWORD}" > /tmp/admin-pw
+chmod 600 /tmp/root-pw /tmp/admin-pw
+info "Passwords generated (will be displayed at end)."
 
 # ==============================================================================
 # STEP 2: Partition disk
@@ -236,9 +251,13 @@ log "fstab generated."
 info "Configuring installed system..."
 
 # Write configuration script that runs inside chroot
+# Passwords are passed as args: $1 = root_pw, $2 = admin_pw
 cat > "${INSTALL_DIR}/root/chroot_config.sh" << 'CHROOTEOF'
 #!/usr/bin/env bash
 set -euo pipefail
+
+ROOT_PW="${1}"
+ADMIN_PW="${2}"
 
 echo "[CONFIG] Configuring AcreetionOS Server..."
 
@@ -253,22 +272,35 @@ echo "KEYMAP=us" > /etc/vconsole.conf
 echo "acreetion-server" > /etc/hostname
 
 # Hosts
-cat > /etc/hosts << 'EOF'
+cat > /etc/hosts << 'HOSTSEOF'
 127.0.0.1   localhost
 ::1         localhost
 127.0.1.1   acreetion-server.localdomain acreetion-server
-EOF
+HOSTSEOF
 
 # Timezone
 ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 hwclock --systohc
 
-# Root password
-echo "root:acreetion" | chpasswd
+# Set passwords (passed in from installer)
+echo "root:${ROOT_PW}" | chpasswd
+useradd -m -G wheel,users,docker,libvirt -s /bin/bash admin 2>/dev/null || true
+echo "admin:${ADMIN_PW}" | chpasswd
 
-# Create admin user
-useradd -m -G wheel,users,docker,libvirt -s /bin/bash admin
-echo "admin:acreetion" | chpasswd
+# Write credentials to disk for the user
+cat > /root/.credentials.txt << CREDEOF
+╔══════════════════════════════════════════════════════════════╗
+║        AcreetionOS Server — Generated Credentials           ║
+║  These were randomly generated during installation.         ║
+║  CHANGE THEM IMMEDIATELY with 'passwd' after first login.   ║
+╚══════════════════════════════════════════════════════════════╝
+
+Root:  ${ROOT_PW}
+Admin: ${ADMIN_PW}
+
+ssh admin@<ip-address>
+CREDEOF
+chmod 600 /root/.credentials.txt
 
 # Sudo config
 echo "%wheel ALL=(ALL:ALL) ALL" > /etc/sudoers.d/99-wheel
@@ -315,8 +347,8 @@ CHROOTEOF
 
 chmod +x "${INSTALL_DIR}/root/chroot_config.sh"
 
-# Execute configuration in chroot
-arch-chroot "${INSTALL_DIR}" /root/chroot_config.sh 2>&1 | grep -v "^$" || true
+# Execute configuration in chroot — pass passwords as arguments
+arch-chroot "${INSTALL_DIR}" /root/chroot_config.sh "${ROOT_PASSWORD}" "${USER_PASSWORD}" 2>&1 | grep -v "^$" || true
 
 # ==============================================================================
 # STEP 8: Install the full package set (optional, done post-config)
@@ -397,16 +429,24 @@ fi
 
 echo ""
 echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║          ✓ AcreetionOS Server installed successfully!       ║${NC}"
 echo -e "${GREEN}║                                                              ║${NC}"
-echo -e "${GREEN}║  User:    admin / acreetion                                  ║${NC}"
-echo -e "${GREEN}║  Root:    root / acreetion                                   ║${NC}"
-echo -e "${GREEN}║  SSH:     ssh admin@<ip>                                     ║${NC}"
+echo -e "${GREEN}║  ┌─ Generated Credentials ──────────────────────────┐        ║${NC}"
+echo -e "${GREEN}║  │                                                  │        ║${NC}"
+printf "${GREEN}║  │  root:  %-32s  │        ║${NC}\n" "${ROOT_PASSWORD}"
+printf "${GREEN}║  │  admin: %-32s  │        ║${NC}\n" "${USER_PASSWORD}"
+echo -e "${GREEN}║  │                                                  │        ║${NC}"
+echo -e "${GREEN}║  │  SSH:   ssh admin@<ip-address>                   │        ║${NC}"
+echo -e "${GREEN}║  │                                                  │        ║${NC}"
+echo -e "${GREEN}║  │  ⚠  WRITE THESE DOWN. They will not be shown     │        ║${NC}"
+echo -e "${GREEN}║  │     again. Change them after first login.        │        ║${NC}"
+echo -e "${GREEN}║  │     Credentials also saved at                    │        ║${NC}"
+echo -e "${GREEN}║  │     /root/.credentials.txt on the new system.    │        ║${NC}"
+echo -e "${GREEN}║  └──────────────────────────────────────────────────┘        ║${NC}"
 echo -e "${GREEN}║                                                              ║${NC}"
 echo -e "${GREEN}║  Services:  nginx, mariadb, docker, libvirt, prometheus...   ║${NC}"
 echo -e "${GREEN}║  Desktop:   Cinnamon (lightdm auto-login after reboot)       ║${NC}"
-echo -e "${GREEN}║                                                              ║${NC}"
-echo -e "${GREEN}║  CHANGE YOUR PASSWORDS AFTER FIRST LOGIN!                    ║${NC}"
 echo -e "${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
