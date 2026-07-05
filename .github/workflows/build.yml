@@ -1,8 +1,10 @@
 # ==============================================================================
 # AcreetionOS Server — Quarterly ISO Build Pipeline
 # Builds ISO automatically on the 1st of January, April, July, and October.
-# Also supports manual trigger for urgent releases.
+# Now uses the meta-package approach: packages.x86_64 just says "acreetionos-server"
+# and the meta-package defines all dependencies.
 #
+# Uploads to: Cloudflare R2, Internet Archive, SourceForge, GitHub Releases
 # #KeepLinuxFree #AcreetionOSWillAlwaysBeFree
 # ==============================================================================
 
@@ -21,6 +23,9 @@ on:
 
 env:
   ISO_NAME: "acreetionos-server"
+  R2_BUCKET: "acreetionos-server"
+  IA_PREFIX: "AcreetionOS-Server"
+  SF_PATH: "acreetionos-iso-image/server"
   BUILD_DIR: "/tmp/archiso-build"
 
 jobs:
@@ -51,7 +56,10 @@ jobs:
             syslinux \
             dosfstools \
             libisoburn \
-            mtools
+            mtools \
+            curl \
+            zip \
+            python
         shell: bash
 
       - name: Configure build
@@ -61,6 +69,8 @@ jobs:
           if [[ -n "${{ inputs.version_suffix }}" ]]; then
             sed -i "s/iso_version=\"1.0\"/iso_version=\"1.0-${{ inputs.version_suffix }}\"/" profiledef.sh
           fi
+          # Use meta-package approach — packages.x86_64 just needs the meta-package
+          echo "acreetionos-server" > packages.x86_64
           # Generate build info
           echo "BUILD_ID=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
           echo "ISO_VERSION=$(grep ^iso_version profiledef.sh | cut -d'"' -f2)" >> $GITHUB_ENV
@@ -75,19 +85,89 @@ jobs:
           ISO_FILE=$(find ../ISO -name "*.iso" -type f | head -1)
           if [[ -z "${ISO_FILE}" ]]; then
             echo "No ISO found in ../ISO/"
+            ls -la out/ 2>/dev/null || true
             exit 1
           fi
           cp "${ISO_FILE}" /tmp/iso-output/
-          echo "ISO_FILE=$(basename ${ISO_FILE})" >> $GITHUB_ENV
+          echo "ISO_FILENAME=$(basename ${ISO_FILE})" >> $GITHUB_ENV
         shell: bash
-        timeout-minutes: 120
+        timeout-minutes: 180
+
+      - name: Generate checksums & ZIP
+        run: |
+          cd /tmp/iso-output
+          sha256sum *.iso > SHA256SUMS
+          md5sum *.iso > MD5SUMS
+          zip -9 "$(basename *.iso .iso).iso.zip" *.iso
+          echo "  ✓ Checksums and ZIP generated"
+        shell: bash
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.ISO_NAME }}-${{ env.ISO_VERSION }}-${{ env.BUILD_ID }}
-          path: /tmp/iso-output/*.iso
+          path: /tmp/iso-output/
           retention-days: 90
+
+      - name: Upload to Cloudflare R2
+        env:
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_EMAIL: ${{ secrets.CLOUDFLARE_EMAIL }}
+        run: |
+          AUTH="-H X-Auth-Email:$CF_EMAIL -H X-Auth-Key:$CF_TOKEN"
+          BUCKET="${{ env.R2_BUCKET }}"
+          # Ensure bucket exists
+          curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets" $AUTH \
+            -d "{\"name\":\"$BUCKET\"}" > /dev/null || true
+          cd /tmp/iso-output
+          for F in *.iso *.zip SHA256SUMS MD5SUMS; do
+            [ ! -f "$F" ] && continue
+            N=$(basename "$F")
+            U=$(curl -s -X POST \
+              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets/$BUCKET/objects/${N}/upload" \
+              $AUTH -d '{}' | python3 -c "import sys,json;print(json.load(sys.stdin).get('result',{}).get('uploadURL',''))")
+            if [ -n "$U" ]; then
+              curl -s -X PUT "$U" --data-binary @"$F" && echo "  ✓ R2: $N" || echo "  ✗ R2: $N"
+            else
+              curl -s -X PUT \
+                "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/r2/buckets/$BUCKET/objects/$N" \
+                $AUTH --data-binary @"$F" && echo "  ✓ R2: $N (direct)" || echo "  ✗ R2: $N"
+            fi
+          done
+
+      - name: Upload to Internet Archive
+        env:
+          IA_ACCESS: ${{ secrets.IA_ACCESS_KEY }}
+          IA_SECRET: ${{ secrets.IA_SECRET_KEY }}
+        run: |
+          I=$(ls /tmp/iso-output/*.iso 2>/dev/null | head -1)
+          [ -z "$I" ] && exit 0
+          [ -z "$IA_ACCESS" ] && echo "  ! No IA creds, skipping" && exit 0
+          N=$(basename "$I")
+          ITEM="${{ env.IA_PREFIX }}-$(date +%Y%m%d)"
+          curl -s --location \
+            --header "authorization: LOW $IA_ACCESS:$IA_SECRET" \
+            --header "x-archive-meta01-collection: opensource" \
+            --header "x-archive-meta-title: ${{ env.IA_PREFIX }} $N" \
+            --header "x-archive-meta-description: Quarterly build of ${{ env.IA_PREFIX }}" \
+            --header "x-archive-meta-mediatype: software" \
+            "https://s3.us.archive.org/$ITEM/$N" --upload-file "$I" \
+            && echo "  ✓ IA: $N" || echo "  ✗ IA: Upload failed"
+
+      - name: Upload to SourceForge
+        env:
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+          SF_PASSWORD: ${{ secrets.SF_PASSWORD }}
+        run: |
+          I=$(ls /tmp/iso-output/*.iso 2>/dev/null | head -1)
+          [ -z "$I" ] && exit 0
+          [ -z "$SF_USERNAME" ] && echo "  ! No SF creds, skipping" && exit 0
+          N=$(basename "$I")
+          curl -s -T "$I" \
+            "https://sourceforge.net/projects/${{ env.SF_PATH }}/$N" \
+            --user "$SF_USERNAME:$SF_PASSWORD" \
+            && echo "  ✓ SF: $N" || echo "  ✗ SF: Upload failed"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -97,27 +177,23 @@ jobs:
           name: "AcreetionOS Server v${{ env.ISO_VERSION }} — Quarterly Release"
           body: |
             ## AcreetionOS Server — Quarterly ISO Build
-            
+
             This is an automated quarterly release of AcreetionOS Server.
-            
+
             **Version**: ${{ env.ISO_VERSION }}
             **Build**: ${{ env.BUILD_ID }}
             **Date**: $(date +%Y-%m-%d)
-            
+
             ### What is this?
             AcreetionOS Server is an auto-installing Arch Linux-based server ISO
             with a full Cinnamon desktop experience. Boot it, wait 10 minutes,
             and you have a fully configured server.
-            
-            ### Changes this quarter
-            See the [commit log](https://github.com/AcreetionOS-Code/acreetionos-server/commits/main)
-            for detailed changes since the last release.
-            
+
             ### Verify
             ```bash
             sha256sum *.iso
             ```
-            
+
             #KeepLinuxFree #AcreetionOSWillAlwaysBeFree
           files: /tmp/iso-output/*.iso
         env:
