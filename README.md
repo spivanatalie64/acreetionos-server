@@ -27,4 +27,27 @@ with the tools you actually need to run servers.
 
 ## 🚀 Build
 
-bash
+```bash
+./build.sh
+```
+
+Output ISO lands in `../ISO/`.
+
+## 🔄 Mirrors
+
+| Platform | URL |
+|----------|-----|
+| GitHub | https://github.com/spivanatalie64/acreetionos-server |
+| GitLab.com | https://gitlab.com/sprungles/acreetionos-server |
+| GitLab (self-hosted) | https://gitlab.acreetionos.org/natalie/acreetionos-server |
+| Codeberg | https://codeberg.org/sprunglesontheberg/acreetionos-server |
+
+## 📖 Documentation
+
+Full documentation, deployment guides, and configuration references:
+
+➡️ **https://acreetionos.org/wiki.conf**
+
+## 📄 License
+
+GPL-3.0 — see [LICENSE](LICENSE).
